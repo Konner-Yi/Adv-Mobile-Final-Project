@@ -1,0 +1,3 @@
+the features folder contains all the app sections or categories. For example, the home page and its specific UI and logic is here
+and the login and authentication feature and their specific logic is here as well. Each one should have their own folder
+
