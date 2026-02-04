@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
-class MapPage extends StatelessWidget {
-  const MapPage({super.key});
+class SearchPage extends StatelessWidget {
+  const SearchPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Map'),
+        title: const Text('Search'),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -18,7 +18,7 @@ class MapPage extends StatelessWidget {
         ],
       ),
       body: const Center(
-        child: Text('Map will go here'),
+        child: Text('Search functionality will go here'),
       ),
     );
   }
