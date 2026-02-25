@@ -21,9 +21,9 @@ class App extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       initialRoute: '/login',
       routes: {
-        '/login': (context) => const LoginScreen(),
-        '/newAccount': (context) => const RegisterScreen(),
-        '/home': (context) => const HomeScreen(),
+        '/login': (context) => const LoginPage(),
+        '/newAccount': (context) => const RegistrationScreen(),
+        '/home': (context) => const HomePage(),
         '/map': (context) => const MapPage(),
         '/profile': (context) => const ProfilePage(),
         '/search': (context) => const SearchPage(),

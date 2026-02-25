@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
-import '../map/map_page.dart';
+import 'package:flutter/services.dart';
 
 class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+  final VoidCallback onOpenMap;
+
+  const HomePage({
+    super.key,
+    required this.onOpenMap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -59,13 +64,8 @@ class HomePage extends StatelessWidget {
               child: Center(
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    // Navigate to map page
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const MapPage(),
-                      ),
-                    );
+                    HapticFeedback.mediumImpact();
+                    onOpenMap();
                   },
                   icon: const Icon(Icons.map),
                   label: const Text('Open Interactive Map'),
@@ -161,42 +161,6 @@ class HomePage extends StatelessWidget {
           ),
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 0,
-        onTap: (index) {
-          if (index == 1) { // Map tab
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const MapPage(),
-              ),
-            );
-          }
-          // Handle other tabs as needed
-        },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.map),
-            label: 'Map',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.add_location),
-            label: 'Add',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.favorite),
-            label: 'Saved',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
-      ),
     );
   }
 }
@@ -282,11 +246,11 @@ class PlaceCard extends StatelessWidget {
                   const SizedBox(height: 5),
                   Row(
                     children: [
-                      Icon(Icons.star, color: Colors.amber[600], size: 16),
+                      Icon(Icons.star, color: Colors.amber, size: 16),
                       const SizedBox(width: 4),
                       const Text('4.5'),
                       const SizedBox(width: 16),
-                      Icon(Icons.location_on, color: Colors.blue[600], size: 16),
+                      Icon(Icons.location_on, color: Colors.blue, size: 16),
                       const SizedBox(width: 4),
                       const Text('15 min'),
                     ],
@@ -298,6 +262,7 @@ class PlaceCard extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.favorite_border),
             onPressed: () {
+              HapticFeedback.lightImpact();
               // Save place
             },
           ),

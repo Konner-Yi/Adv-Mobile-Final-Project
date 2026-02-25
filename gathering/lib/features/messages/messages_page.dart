@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../../core/services/auth_database.dart';
 
 class MessagesPage extends StatelessWidget {
   const MessagesPage({super.key});
@@ -11,8 +13,12 @@ class MessagesPage extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () {
-              Navigator.pushReplacementNamed(context, '/login');
+            onPressed: () async {
+              HapticFeedback.selectionClick();
+              await AuthDatabase().logout();
+              if (context.mounted) {
+                Navigator.pushReplacementNamed(context, '/login');
+              }
             },
           ),
         ],

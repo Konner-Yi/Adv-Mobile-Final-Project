@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../login/login_page.dart';           
-import '../registration/registration_screen.dart'; 
-import '../home/home_page.dart';              
+import '../login/login_page.dart';
+import '../registration/registration_screen.dart';
+import '../main_nav/main_nav_page.dart';
 import '../../core/services/auth_database.dart';
 
 class WelcomePage extends StatefulWidget {
@@ -23,13 +23,13 @@ class _WelcomePageState extends State<WelcomePage> {
 
   Future<void> _checkIfLoggedIn() async {
     final user = await _authDatabase.getCurrentUser();
-    
+
     if (user != null && mounted) {
-      // User is already logged in, go to home page
+      // User is already logged in, go to main nav page
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => HomePage(),
+          builder: (context) => const MainNavPage(),
         ),
       );
     } else {
@@ -76,26 +76,20 @@ class _WelcomePageState extends State<WelcomePage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
-                  Icons.location_on,
-                  size: 80,
-                  color: Colors.blue,
-                ),
-                const SizedBox(height: 20),
                 const Text(
                   'Local Link',
                   style: TextStyle(
-                    fontSize: 36,
+                    fontSize: 42,
                     fontWeight: FontWeight.bold,
-                    color: Colors.blue,
                   ),
                 ),
                 const SizedBox(height: 10),
                 const Text(
-                  'Discover places near you',
+                  'Find places, people, and events near you.',
+                  textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 18,
                     color: Colors.grey,
+                    fontSize: 16,
                   ),
                 ),
                 const SizedBox(height: 40),
@@ -106,7 +100,7 @@ class _WelcomePageState extends State<WelcomePage> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => LoginPage(),
+                          builder: (context) => const LoginPage(),
                         ),
                       );
                     },
@@ -130,7 +124,7 @@ class _WelcomePageState extends State<WelcomePage> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => RegistrationScreen(),
+                          builder: (context) => const RegistrationScreen(),
                         ),
                       );
                     },
@@ -154,10 +148,10 @@ class _WelcomePageState extends State<WelcomePage> {
                 const SizedBox(height: 10),
                 TextButton(
                   onPressed: () {
-                    Navigator.push(
+                    Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => HomePage(),
+                        builder: (context) => const MainNavPage(),
                       ),
                     );
                   },
