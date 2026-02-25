@@ -63,7 +63,7 @@ class HomePage extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const MapPage(),
+                        builder: (context) => const MapScreen(),
                       ),
                     );
                   },
@@ -168,7 +168,7 @@ class HomePage extends StatelessWidget {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => const MapPage(),
+                builder: (context) => const MapScreen(),
               ),
             );
           }
