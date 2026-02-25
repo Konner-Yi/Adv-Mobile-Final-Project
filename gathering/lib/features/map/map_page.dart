@@ -6,6 +6,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_compass/flutter_compass.dart';
+import 'package:local_link_web/features/home/home_page.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({Key? key}) : super(key: key);
@@ -144,6 +145,15 @@ class _MapScreenState extends State<MapScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const HomePage()),
+                (route) => false,
+          );
+        },
+        child: const Icon(Icons.home),
+      ),
       body: SizedBox.expand(
         child: FlutterMap(
           mapController: _mapController,
@@ -162,17 +172,13 @@ class _MapScreenState extends State<MapScreen> {
             ),
             MarkerLayer(
               markers: [
-                // temporary post markers (visual only)
                 ..._postMarkers,
-
-                // user location marker
                 if (_currentLocation != null)
                   Marker(
                     point: _currentLocation!,
                     width: 50,
                     height: 50,
-                    child: _buildUserMarker(
-                    ),
+                    child: _buildUserMarker(),
                   ),
               ],
             ),
