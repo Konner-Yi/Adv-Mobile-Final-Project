@@ -9,7 +9,7 @@ class HomePage extends StatelessWidget {
     required this.onOpenMap,
   });
 
-  // Bright theme accents (match your gradient nav)
+  // Bright theme accents
   static const Color cyan = Color(0xFF00C6FF);
   static const Color purple = Color(0xFF7F00FF);
   static const Color heading = Color(0xFF00E5FF);
@@ -17,7 +17,7 @@ class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Let the gradient show through
+      // Lets the gradient show through
       backgroundColor: Colors.transparent,
 
       appBar: AppBar(
@@ -53,8 +53,8 @@ class HomePage extends StatelessWidget {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFF5C6BC0), // soft cyan
-              Color(0xFF5C6BC0), // soft purple
+              Color(0xFF5C6BC0),
+              Color(0xFF5C6BC0),
             ],
           ),
         ),
@@ -114,7 +114,7 @@ class HomePage extends StatelessWidget {
                   child: ElevatedButton.icon(
                     onPressed: () {
                       HapticFeedback.mediumImpact();
-                      onOpenMap(); // ✅ keeps tab switch functionality
+                      onOpenMap();
                     },
                     icon: const Icon(Icons.map),
                     label: const Text('Open Interactive Map'),

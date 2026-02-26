@@ -45,7 +45,6 @@ class _MainNavPageState extends State<MainNavPage> {
         children: pages,
       ),
 
-      // ✅ Bright, rounded, elevated gradient nav
       bottomNavigationBar: SafeArea(
         top: false,
         child: Padding(
@@ -57,8 +56,8 @@ class _MainNavPageState extends State<MainNavPage> {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  Color(0xFF00C6FF), // bright cyan
-                  Color(0xFF7F00FF), // bright purple
+                  Color(0xFF00C6FF),
+                  Color(0xFF7F00FF),
                 ],
               ),
               boxShadow: [
