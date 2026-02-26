@@ -5,14 +5,28 @@ import '../../core/services/auth_database.dart';
 class MapPage extends StatelessWidget {
   const MapPage({super.key});
 
+  static const Color cyan = Color(0xFF00E5FF);
+  static const Color indigo = Color(0xFF3949AB);
+  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent,
+
       appBar: AppBar(
-        title: const Text('Map'),
+        backgroundColor: indigo,
+        elevation: 0,
+        title: const Text(
+          'Map',
+          style: TextStyle(
+            color: cyan,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout),
+            icon: const Icon(Icons.logout, color: cyan),
             onPressed: () async {
               HapticFeedback.selectionClick();
               await AuthDatabase().logout();
@@ -23,8 +37,28 @@ class MapPage extends StatelessWidget {
           ),
         ],
       ),
-      body: const Center(
-        child: Text('Map will go here'),
+
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF5C6BC0),
+              Color(0xFF5C6BC0),
+            ],
+          ),
+        ),
+        child: const Center(
+          child: Text(
+            'Map will go here',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
       ),
     );
   }
