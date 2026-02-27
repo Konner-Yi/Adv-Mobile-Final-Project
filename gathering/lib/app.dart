@@ -24,7 +24,7 @@ class App extends StatelessWidget {
         '/login': (context) => const LoginPage(),
         '/newAccount': (context) => const RegistrationScreen(),
         '/home': (context) => const HomePage(),
-        '/map': (context) => const MapPage(),
+        '/map': (context) => const MapScreen(),
         '/profile': (context) => const ProfilePage(),
         '/search': (context) => const SearchPage(),
         '/messages': (context) => const MessagesPage(),
