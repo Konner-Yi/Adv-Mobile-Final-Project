@@ -1,4 +1,4 @@
-name: gathering
+name: local_link_web
 description: A map-based social discovery app
 publish_to: 'none'
 version: 1.0.0+1
@@ -13,6 +13,10 @@ dependencies:
   flutter_secure_storage: ^9.1.1
   crypto: ^3.0.3
   cupertino_icons: ^1.0.6
+  flutter_map: ^8.2.2
+  latlong2: ^0.9.0
+  geolocator: ^11.0.0
+  flutter_compass: ^0.8.0
 
 dev_dependencies:
   flutter_test:

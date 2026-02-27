@@ -1,201 +1,221 @@
 import 'package:flutter/material.dart';
-import '../map/map_page.dart';
+import 'package:flutter/services.dart';
 
 class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+  final VoidCallback onOpenMap;
+
+  const HomePage({
+    super.key,
+    required this.onOpenMap,
+  });
+
+  // Bright theme accents
+  static const Color cyan = Color(0xFF00C6FF);
+  static const Color purple = Color(0xFF7F00FF);
+  static const Color heading = Color(0xFF00E5FF);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // Lets the gradient show through
+      backgroundColor: Colors.transparent,
+
       appBar: AppBar(
-        title: const Text('Local Link'),
+        backgroundColor: const Color(0xFF3949AB),
+        elevation: 0,
+        title: const Text(
+          'Local Link',
+          style: TextStyle(
+            color: Color(0xFF00E5FF),
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.2,
+          ),
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications),
+            icon: const Icon(Icons.notifications, color: cyan),
             onPressed: () {
               // Notifications
             },
           ),
           IconButton(
-            icon: const Icon(Icons.account_circle),
+            icon: const Icon(Icons.account_circle, color: cyan),
             onPressed: () {
               // Profile
             },
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Search bar
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Search for places...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(25),
+
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF5C6BC0),
+              Color(0xFF5C6BC0),
+            ],
+          ),
+        ),
+        child: Column(
+          children: [
+            // Search bar
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(28),
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: cyan.withOpacity(0.15),
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
                 ),
-                filled: true,
-                fillColor: Colors.grey[100],
+                child: TextField(
+                  decoration: InputDecoration(
+                    hintText: 'Search for places...',
+                    prefixIcon: const Icon(Icons.search, color: cyan),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(28),
+                      borderSide: BorderSide.none,
+                    ),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                ),
               ),
             ),
-          ),
 
-          // Map preview
-          Expanded(
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-                borderRadius: BorderRadius.circular(20),
-                image: const DecorationImage(
-                  image: NetworkImage(
-                    'https://images.unsplash.com/photo-1526778548025-fa2f459cd5c1?auto=format&fit=crop&w=800',
+            // Map preview
+            Expanded(
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(22),
+                  image: const DecorationImage(
+                    image: NetworkImage(
+                      'https://images.unsplash.com/photo-1526778548025-fa2f459cd5c1?auto=format&fit=crop&w=800',
+                    ),
+                    fit: BoxFit.cover,
                   ),
-                  fit: BoxFit.cover,
+                  boxShadow: [
+                    BoxShadow(
+                      color: purple.withOpacity(0.22),
+                      blurRadius: 18,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
                 ),
-              ),
-              child: Center(
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    // Navigate to map page
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const MapPage(),
+                child: Center(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      HapticFeedback.mediumImpact();
+                      onOpenMap();
+                    },
+                    icon: const Icon(Icons.map),
+                    label: const Text('Open Interactive Map'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: cyan,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 26,
+                        vertical: 13,
                       ),
-                    );
-                  },
-                  icon: const Icon(Icons.map),
-                  label: const Text('Open Interactive Map'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white.withOpacity(0.9),
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 12,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      elevation: 8,
                     ),
                   ),
                 ),
               ),
             ),
-          ),
 
-          // Categories
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Categories',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                SizedBox(height: 10),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      CategoryChip(icon: Icons.restaurant, label: 'Food'),
-                      SizedBox(width: 10),
-                      CategoryChip(icon: Icons.local_cafe, label: 'Coffee'),
-                      SizedBox(width: 10),
-                      CategoryChip(icon: Icons.park, label: 'Parks'),
-                      SizedBox(width: 10),
-                      CategoryChip(icon: Icons.shopping_bag, label: 'Shopping'),
-                      SizedBox(width: 10),
-                      CategoryChip(icon: Icons.nightlife, label: 'Nightlife'),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Recent places
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
+            // Categories
+            const Padding(
+              padding: EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Nearby Places',
+                  Text(
+                    'Categories',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
+                      color: HomePage.heading,
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  Expanded(
-                    child: ListView(
-                      children: const [
-                        PlaceCard(
-                          name: 'Central Park Cafe',
-                          category: 'Coffee • 0.5 mi',
-                          imageUrl:
-                              'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=400',
-                        ),
-                        PlaceCard(
-                          name: 'Sunset Viewpoint',
-                          category: 'Park • 1.2 mi',
-                          imageUrl:
-                              'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=400',
-                        ),
-                        PlaceCard(
-                          name: 'Urban Bistro',
-                          category: 'Restaurant • 0.8 mi',
-                          imageUrl:
-                              'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w-400',
-                        ),
+                  SizedBox(height: 10),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        CategoryChip(icon: Icons.restaurant, label: 'Food'),
+                        SizedBox(width: 10),
+                        CategoryChip(icon: Icons.local_cafe, label: 'Coffee'),
+                        SizedBox(width: 10),
+                        CategoryChip(icon: Icons.park, label: 'Parks'),
+                        SizedBox(width: 10),
+                        CategoryChip(icon: Icons.shopping_bag, label: 'Shopping'),
+                        SizedBox(width: 10),
+                        CategoryChip(icon: Icons.nightlife, label: 'Nightlife'),
                       ],
                     ),
                   ),
                 ],
               ),
             ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 0,
-        onTap: (index) {
-          if (index == 1) { // Map tab
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const MapPage(),
+
+            // Recent places
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Nearby Places',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: heading,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Expanded(
+                      child: ListView(
+                        children: const [
+                          PlaceCard(
+                            name: 'Central Park Cafe',
+                            category: 'Coffee • 0.5 mi',
+                            imageUrl:
+                                'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=400',
+                          ),
+                          PlaceCard(
+                            name: 'Sunset Viewpoint',
+                            category: 'Park • 1.2 mi',
+                            imageUrl:
+                                'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=400',
+                          ),
+                          PlaceCard(
+                            name: 'Urban Bistro',
+                            category: 'Restaurant • 0.8 mi',
+                            imageUrl:
+                                'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=400',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            );
-          }
-          // Handle other tabs as needed
-        },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.map),
-            label: 'Map',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.add_location),
-            label: 'Add',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.favorite),
-            label: 'Saved',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -211,14 +231,18 @@ class CategoryChip extends StatelessWidget {
     required this.label,
   });
 
+  static const Color cyan = HomePage.cyan;
+  static const Color purple = HomePage.purple;
+
   @override
   Widget build(BuildContext context) {
     return Chip(
-      avatar: Icon(icon, size: 18),
+      avatar: Icon(icon, size: 18, color: purple),
       label: Text(label),
-      backgroundColor: Colors.blue[50],
+      backgroundColor: cyan.withOpacity(0.15),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(22),
+        side: BorderSide(color: cyan.withOpacity(0.35)),
       ),
     );
   }
@@ -236,6 +260,9 @@ class PlaceCard extends StatelessWidget {
     required this.imageUrl,
   });
 
+  static const Color cyan = HomePage.cyan;
+  static const Color purple = HomePage.purple;
+
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -243,6 +270,8 @@ class PlaceCard extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(15),
       ),
+      elevation: 5,
+      shadowColor: cyan.withOpacity(0.18),
       child: Row(
         children: [
           Container(
@@ -282,11 +311,11 @@ class PlaceCard extends StatelessWidget {
                   const SizedBox(height: 5),
                   Row(
                     children: [
-                      Icon(Icons.star, color: Colors.amber[600], size: 16),
+                      const Icon(Icons.star, color: Colors.amber, size: 16),
                       const SizedBox(width: 4),
                       const Text('4.5'),
                       const SizedBox(width: 16),
-                      Icon(Icons.location_on, color: Colors.blue[600], size: 16),
+                      const Icon(Icons.location_on, color: cyan, size: 16),
                       const SizedBox(width: 4),
                       const Text('15 min'),
                     ],
@@ -296,8 +325,9 @@ class PlaceCard extends StatelessWidget {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.favorite_border),
+            icon: const Icon(Icons.favorite_border, color: purple),
             onPressed: () {
+              HapticFeedback.lightImpact();
               // Save place
             },
           ),

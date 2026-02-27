@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:local_link_web/features/registration/registration_screen.dart';
 
 import 'features/login/login_page.dart';
-import 'features/login/new_account_page.dart';
+import 'features/registration/registration_screen.dart';
 import 'features/home/home_page.dart';
 import 'features/map/map_page.dart';
 import 'features/profile/profile_page.dart';
@@ -21,8 +22,8 @@ class App extends StatelessWidget {
       initialRoute: '/login',
       routes: {
         '/login': (context) => const LoginPage(),
-        '/newAccount': (context) => const NewAccountPage(),
-        '/home': (context) => const HomePage(),
+        '/newAccount': (context) => const RegistrationScreen(),
+        '/home': (context) => HomePage(onOpenMap: () {  },),
         '/map': (context) => const MapPage(),
         '/profile': (context) => const ProfilePage(),
         '/search': (context) => const SearchPage(),

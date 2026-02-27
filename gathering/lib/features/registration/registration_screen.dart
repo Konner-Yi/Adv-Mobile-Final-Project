@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/services/auth_database.dart';
-import '../home/home_page.dart';
+import '../main_nav/main_nav_page.dart';
 
 class RegistrationScreen extends StatefulWidget {
   const RegistrationScreen({super.key});
@@ -30,53 +31,62 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     super.dispose();
   }
 
-Future<void> _register() async {
-  if (_formKey.currentState!.validate()) {
-   
-    if (_passwordController.text != _confirmPasswordController.text) {
+  Future<void> _register() async {
+    if (_formKey.currentState!.validate()) {
+      if (_passwordController.text != _confirmPasswordController.text) {
+        setState(() {
+          _errorMessage = 'Passwords do not match';
+        });
+        HapticFeedback.vibrate();
+        return;
+      }
+
       setState(() {
-        _errorMessage = 'Passwords do not match';
+        _isLoading = true;
+        _errorMessage = '';
       });
-      return;
-    }
 
-    setState(() {
-      _isLoading = true;
-      _errorMessage = '';
-    });
+      final username = _usernameController.text.trim();
+      final email = _emailController.text.trim();
+      final password = _passwordController.text.trim();
 
-    final username = _usernameController.text.trim();
-    final email = _emailController.text.trim();
-    final password = _passwordController.text.trim();
+      final success = await _authDatabase.saveUser(username, email, password);
 
-    final success = await _authDatabase.saveUser(username, email, password);
+      if (success) {
+        final user = await _authDatabase.authenticate(email, password);
 
-    if (success) {
-      
-      final user = await _authDatabase.authenticate(email, password);
-      
-      if (user != null) {
-        
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => HomePage(),
-          ),
-        );
+        if (user != null) {
+          HapticFeedback.mediumImpact();
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const MainNavPage(),
+            ),
+          );
+        } else {
+          setState(() {
+            _isLoading = false;
+            _errorMessage =
+                'Account created but login failed. Please login manually.';
+          });
+          HapticFeedback.vibrate();
+        }
       } else {
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Account created but login failed. Please login manually.';
+          _errorMessage = 'Email already exists';
         });
+        HapticFeedback.vibrate();
       }
     } else {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Email already exists';
-      });
+      HapticFeedback.vibrate();
     }
   }
-}
+
+  void _onCreateAccountPressed() {
+    HapticFeedback.mediumImpact();
+    _register();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -84,7 +94,10 @@ Future<void> _register() async {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            HapticFeedback.selectionClick();
+            Navigator.pop(context);
+          },
         ),
         title: const Text('Create Account'),
       ),
@@ -113,8 +126,6 @@ Future<void> _register() async {
                   ),
                 ),
                 const SizedBox(height: 40),
-
-                // Error message
                 if (_errorMessage.isNotEmpty)
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -126,7 +137,8 @@ Future<void> _register() async {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.error_outline, color: Colors.red, size: 20),
+                        const Icon(Icons.error_outline,
+                            color: Colors.red, size: 20),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -137,8 +149,6 @@ Future<void> _register() async {
                       ],
                     ),
                   ),
-
-                // Username field
                 TextFormField(
                   controller: _usernameController,
                   decoration: const InputDecoration(
@@ -157,8 +167,6 @@ Future<void> _register() async {
                   },
                 ),
                 const SizedBox(height: 20),
-
-                // Email field
                 TextFormField(
                   controller: _emailController,
                   decoration: const InputDecoration(
@@ -178,8 +186,6 @@ Future<void> _register() async {
                   },
                 ),
                 const SizedBox(height: 20),
-
-                // Password field
                 TextFormField(
                   controller: _passwordController,
                   decoration: InputDecoration(
@@ -188,12 +194,10 @@ Future<void> _register() async {
                     prefixIcon: const Icon(Icons.lock),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _showPassword ? Icons.visibility : Icons.visibility_off,
-                      ),
+                          _showPassword ? Icons.visibility : Icons.visibility_off),
                       onPressed: () {
-                        setState(() {
-                          _showPassword = !_showPassword;
-                        });
+                        HapticFeedback.selectionClick();
+                        setState(() => _showPassword = !_showPassword);
                       },
                     ),
                   ),
@@ -209,8 +213,6 @@ Future<void> _register() async {
                   },
                 ),
                 const SizedBox(height: 20),
-
-                // Confirm password field
                 TextFormField(
                   controller: _confirmPasswordController,
                   decoration: InputDecoration(
@@ -218,13 +220,13 @@ Future<void> _register() async {
                     border: const OutlineInputBorder(),
                     prefixIcon: const Icon(Icons.lock_outline),
                     suffixIcon: IconButton(
-                      icon: Icon(
-                        _showConfirmPassword ? Icons.visibility : Icons.visibility_off,
-                      ),
+                      icon: Icon(_showConfirmPassword
+                          ? Icons.visibility
+                          : Icons.visibility_off),
                       onPressed: () {
-                        setState(() {
-                          _showConfirmPassword = !_showConfirmPassword;
-                        });
+                        HapticFeedback.selectionClick();
+                        setState(() =>
+                            _showConfirmPassword = !_showConfirmPassword);
                       },
                     ),
                   ),
@@ -237,10 +239,8 @@ Future<void> _register() async {
                   },
                 ),
                 const SizedBox(height: 30),
-
-                // Register button
                 ElevatedButton(
-                  onPressed: _isLoading ? null : _register,
+                  onPressed: _isLoading ? null : _onCreateAccountPressed,
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
@@ -262,15 +262,10 @@ Future<void> _register() async {
                         ),
                 ),
                 const SizedBox(height: 30),
-
-                // Terms and conditions
                 const Text(
                   'By registering, you agree to our Terms of Service and Privacy Policy',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey,
-                  ),
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
                 ),
               ],
             ),

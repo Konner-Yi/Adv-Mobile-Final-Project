@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/services/auth_database.dart';
-import '../home/home_page.dart';
+import '../main_nav/main_nav_page.dart';
+import '../welcome/welcome_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -41,23 +43,38 @@ class _LoginPageState extends State<LoginPage> {
       });
 
       if (user != null) {
-        // Login successful
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => HomePage(),
+            builder: (context) => const MainNavPage(),
           ),
         );
       } else {
         setState(() {
           _errorMessage = 'Invalid email or password';
         });
+        HapticFeedback.vibrate();
       }
     }
   }
 
+  void _onLoginPressed() {
+    HapticFeedback.mediumImpact();
+    _login();
+  }
+
+  void _onGuestPressed() {
+    HapticFeedback.mediumImpact();
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const MainNavPage(),
+      ),
+    );
+  }
+
   Future<void> _testCredentials() async {
-    // Auto-fill test credentials
+    HapticFeedback.selectionClick();
     _emailController.text = 'test@example.com';
     _passwordController.text = 'password123';
   }
@@ -68,7 +85,15 @@ class _LoginPageState extends State<LoginPage> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            HapticFeedback.selectionClick();
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const WelcomePage(),
+              ),
+            );
+          },
         ),
         title: const Text('Login'),
         actions: [
@@ -104,8 +129,6 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
                 const SizedBox(height: 40),
-
-                // Error message
                 if (_errorMessage.isNotEmpty)
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -128,8 +151,6 @@ class _LoginPageState extends State<LoginPage> {
                       ],
                     ),
                   ),
-
-                // Email field
                 TextFormField(
                   controller: _emailController,
                   decoration: const InputDecoration(
@@ -139,18 +160,12 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   keyboardType: TextInputType.emailAddress,
                   validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your email';
-                    }
-                    if (!value.contains('@')) {
-                      return 'Please enter a valid email';
-                    }
+                    if (value == null || value.isEmpty) return 'Please enter your email';
+                    if (!value.contains('@')) return 'Please enter a valid email';
                     return null;
                   },
                 ),
                 const SizedBox(height: 20),
-
-                // Password field
                 TextFormField(
                   controller: _passwordController,
                   decoration: const InputDecoration(
@@ -160,17 +175,13 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   obscureText: true,
                   validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your password';
-                    }
+                    if (value == null || value.isEmpty) return 'Please enter your password';
                     return null;
                   },
                 ),
                 const SizedBox(height: 30),
-
-                // Login button
                 ElevatedButton(
-                  onPressed: _isLoading ? null : _login,
+                  onPressed: _isLoading ? null : _onLoginPressed,
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
@@ -192,18 +203,14 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                 ),
                 const SizedBox(height: 20),
-
-                // Forgot password
                 TextButton(
                   onPressed: () {
-                    // Show demo users
+                    HapticFeedback.selectionClick();
                     _showDemoUsers();
                   },
                   child: const Text('Demo Accounts'),
                 ),
                 const SizedBox(height: 30),
-
-                // Divider
                 const Row(
                   children: [
                     Expanded(child: Divider()),
@@ -215,17 +222,8 @@ class _LoginPageState extends State<LoginPage> {
                   ],
                 ),
                 const SizedBox(height: 20),
-
-                // Continue as Guest
                 OutlinedButton(
-                  onPressed: () {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const HomePage(),
-                      ),
-                    );
-                  },
+                  onPressed: _onGuestPressed,
                   child: const Text('Continue as Guest'),
                 ),
               ],
@@ -256,7 +254,10 @@ class _LoginPageState extends State<LoginPage> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              HapticFeedback.selectionClick();
+              Navigator.pop(context);
+            },
             child: const Text('OK'),
           ),
         ],
