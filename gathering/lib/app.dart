@@ -23,8 +23,8 @@ class App extends StatelessWidget {
       routes: {
         '/login': (context) => const LoginPage(),
         '/newAccount': (context) => const RegistrationScreen(),
-        '/home': (context) => const HomePage(),
-        '/map': (context) => const MapScreen(),
+        '/home': (context) => HomePage(onOpenMap: () {  },),
+        '/map': (context) => const MapPage(),
         '/profile': (context) => const ProfilePage(),
         '/search': (context) => const SearchPage(),
         '/messages': (context) => const MessagesPage(),
