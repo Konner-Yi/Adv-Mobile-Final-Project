@@ -1,23 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/services/auth_service.dart';
+import '../../core/services/friends_service.dart';
 import 'settings_page.dart';
 import 'edit_profile_page.dart';
+import '../friends/friends_page.dart';
 
 class ProfilePage extends StatefulWidget {
-  const ProfilePage({super.key});
+  final String? uid;
+
+  const ProfilePage({super.key, this.uid});
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  // ── Palette ───────────────────────────────────────────────────────────────
-  static const Color blue    = Color(0xFF1E88E5);
-  static const Color yellow  = Color(0xFFFFD600);
-  static const Color white   = Color(0xFFFFFFFF);
-  static const Color grey50  = Color(0xFFFAFAFA);
+  static const Color blue = Color(0xFF1E88E5);
+  static const Color yellow = Color(0xFFFFD600);
+  static const Color white = Color(0xFFFFFFFF);
+  static const Color grey50 = Color(0xFFFAFAFA);
   static const Color grey100 = Color(0xFFF5F5F5);
   static const Color grey200 = Color(0xFFEEEEEE);
   static const Color grey400 = Color(0xFFBDBDBD);
@@ -25,10 +29,17 @@ class _ProfilePageState extends State<ProfilePage> {
   static const Color grey600 = Color(0xFF757575);
   static const Color grey900 = Color(0xFF212121);
 
+  bool get _isOwnProfile {
+    final currentUid = AuthService.instance.currentUser?.uid;
+    return widget.uid == null || widget.uid == currentUid;
+  }
+
   void _openSettings() {
     HapticFeedback.selectionClick();
-    Navigator.push(context,
-        MaterialPageRoute(builder: (_) => const SettingsPage()));
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SettingsPage()),
+    );
   }
 
   void _openEdit(Map<String, dynamic> profileData) {
@@ -36,40 +47,348 @@ class _ProfilePageState extends State<ProfilePage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-          builder: (_) =>
-              EditProfilePage(initialData: profileData)),
+        builder: (_) => EditProfilePage(initialData: profileData),
+      ),
+    );
+  }
+
+  void _openFriends() {
+    HapticFeedback.selectionClick();
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const FriendsPage()),
     );
   }
 
   Future<void> _logout() async {
     HapticFeedback.selectionClick();
     await AuthService.instance.logout();
-    if (mounted) Navigator.pushReplacementNamed(context, '/welcome');
+    if (mounted) {
+      Navigator.pushReplacementNamed(context, '/welcome');
+    }
+  }
+
+  Future<void> _showMutualFriends({
+    required String currentUid,
+    required String otherUid,
+  }) async {
+    final mutuals = await FriendsService.instance.getMutualFriends(
+      currentUserId: currentUid,
+      otherUserId: otherUid,
+    );
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (_) {
+        return Dialog(
+          backgroundColor: white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: 340,
+              maxHeight: 420,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Mutual Friends',
+                    style: TextStyle(
+                      color: grey900,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (mutuals.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Text(
+                        'No mutual friends',
+                        style: TextStyle(
+                          color: grey600,
+                          fontSize: 14,
+                        ),
+                      ),
+                    )
+                  else
+                    Flexible(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: mutuals.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 10),
+                        itemBuilder: (context, index) {
+                          final user = mutuals[index];
+                          final username = (user['username'] ?? 'User').toString();
+                          final realName = (user['realName'] ?? '').toString();
+                          final photoUrl = (user['photoUrl'] ?? '').toString();
+                          final userUid = (user['uid'] ?? '').toString();
+
+                          return GestureDetector(
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.push(
+                                this.context,
+                                MaterialPageRoute(
+                                  builder: (_) => ProfilePage(uid: userUid),
+                                ),
+                              );
+                            },
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 18,
+                                  backgroundColor: grey200,
+                                  backgroundImage: photoUrl.isNotEmpty
+                                      ? NetworkImage(photoUrl)
+                                      : null,
+                                  child: photoUrl.isEmpty
+                                      ? const Icon(
+                                          Icons.person,
+                                          size: 18,
+                                          color: grey600,
+                                        )
+                                      : null,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        username,
+                                        style: const TextStyle(
+                                          color: grey900,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      if (realName.isNotEmpty)
+                                        Text(
+                                          realName,
+                                          style: const TextStyle(
+                                            color: grey600,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: blue,
+                        foregroundColor: white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text('Close'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showFriends(String currentUid) async {
+    final friends = await FriendsService.instance.streamFriends(currentUid).first;
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (_) {
+        return Dialog(
+          backgroundColor: white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: 340,
+              maxHeight: 420,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Friends',
+                    style: TextStyle(
+                      color: grey900,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (friends.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Text(
+                        'No friends yet',
+                        style: TextStyle(
+                          color: grey600,
+                          fontSize: 14,
+                        ),
+                      ),
+                    )
+                  else
+                    Flexible(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: friends.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 10),
+                        itemBuilder: (context, index) {
+                          final user = friends[index];
+                          final username = (user['username'] ?? 'User').toString();
+                          final realName = (user['realName'] ?? '').toString();
+                          final photoUrl = (user['photoUrl'] ?? '').toString();
+                          final userUid = (user['uid'] ?? '').toString();
+
+                          return GestureDetector(
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.push(
+                                this.context,
+                                MaterialPageRoute(
+                                  builder: (_) => ProfilePage(uid: userUid),
+                                ),
+                              );
+                            },
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 18,
+                                  backgroundColor: grey200,
+                                  backgroundImage: photoUrl.isNotEmpty
+                                      ? NetworkImage(photoUrl)
+                                      : null,
+                                  child: photoUrl.isEmpty
+                                      ? const Icon(
+                                          Icons.person,
+                                          size: 18,
+                                          color: grey600,
+                                        )
+                                      : null,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        username,
+                                        style: const TextStyle(
+                                          color: grey900,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      if (realName.isNotEmpty)
+                                        Text(
+                                          realName,
+                                          style: const TextStyle(
+                                            color: grey600,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: blue,
+                        foregroundColor: white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text('Close'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Stream<Map<String, dynamic>?> _profileStream() {
+    if (_isOwnProfile) {
+      return AuthService.instance.getUserProfileStream();
+    }
+
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.uid)
+        .snapshots()
+        .map((doc) => doc.data());
   }
 
   @override
   Widget build(BuildContext context) {
+    final currentUid = AuthService.instance.currentUser?.uid;
+
     return StreamBuilder<Map<String, dynamic>?>(
-      stream: AuthService.instance.getUserProfileStream(),
+      stream: _profileStream(),
       builder: (context, snapshot) {
         final profile = snapshot.data ?? {};
-        final username   = profile['username']  as String? ?? 'username';
-        final realName   = profile['realName']  as String? ?? '';
-        final pronouns   = profile['pronouns']  as String? ?? '';
-        final bio        = profile['bio']       as String? ?? '';
-        final country    = profile['country']   as String? ?? '';
-        final photoUrl   = profile['photoUrl']  as String? ?? '';
-        final score      = profile['score']     ?? 0;
-        final followers  = profile['followers'] ?? 0;
-        final following  = profile['following'] ?? 0;
-        final rawTags    = profile['tags'];
-        final tags = rawTags is List
-            ? List<String>.from(rawTags)
-            : <String>[];
+        final username = profile['username'] as String? ?? 'username';
+        final realName = profile['realName'] as String? ?? '';
+        final pronouns = profile['pronouns'] as String? ?? '';
+        final bio = profile['bio'] as String? ?? '';
+        final country = profile['country'] as String? ?? '';
+        final photoUrl = profile['photoUrl'] as String? ?? '';
+        final score = profile['score'] ?? 0;
+        final followers = profile['followers'] ?? 0;
+        final following = profile['following'] ?? 0;
+        final friends =
+            profile['friends'] is List ? (profile['friends'] as List).length : 0;
+        final incomingRequests = profile['incomingFriendRequests'] is List
+            ? (profile['incomingFriendRequests'] as List).length
+            : 0;
+        final rawTags = profile['tags'];
+        final tags = rawTags is List ? List<String>.from(rawTags) : <String>[];
 
         return Scaffold(
           backgroundColor: grey50,
-
           appBar: AppBar(
             backgroundColor: white,
             elevation: 0,
@@ -85,24 +404,22 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ),
             actions: [
-              Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: _SettingsButton(onTap: _openSettings),
-              ),
+              if (_isOwnProfile)
+                Padding(
+                  padding: const EdgeInsets.only(right: 12),
+                  child: _SettingsButton(onTap: _openSettings),
+                ),
             ],
             bottom: PreferredSize(
               preferredSize: const Size.fromHeight(1),
               child: Container(height: 1, color: grey200),
             ),
           ),
-
           body: SingleChildScrollView(
             padding: const EdgeInsets.only(bottom: 100),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-
-                // ── Header: avatar + name + stats ───────────────────────
                 Container(
                   color: white,
                   padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
@@ -115,21 +432,16 @@ class _ProfilePageState extends State<ProfilePage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Real name + pronouns
                             Row(
-                              crossAxisAlignment:
-                              CrossAxisAlignment.baseline,
+                              crossAxisAlignment: CrossAxisAlignment.baseline,
                               textBaseline: TextBaseline.alphabetic,
                               children: [
                                 Expanded(
                                   child: Text(
-                                    realName.isEmpty
-                                        ? 'Add your name'
-                                        : realName,
+                                    realName.isEmpty ? 'Add your name' : realName,
                                     style: TextStyle(
-                                      color: realName.isEmpty
-                                          ? grey400
-                                          : grey900,
+                                      color:
+                                          realName.isEmpty ? grey400 : grey900,
                                       fontSize: 16,
                                       fontWeight: FontWeight.w700,
                                       fontStyle: realName.isEmpty
@@ -142,82 +454,313 @@ class _ProfilePageState extends State<ProfilePage> {
                                 if (pronouns.isNotEmpty) ...[
                                   const SizedBox(width: 6),
                                   Container(
-                                    padding:
-                                    const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 3),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: grey100,
-                                      borderRadius:
-                                      BorderRadius.circular(10),
-                                      border: Border.all(
-                                          color: grey200),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: grey200),
                                     ),
                                     child: Text(
                                       pronouns,
                                       style: const TextStyle(
-                                          color: grey600,
-                                          fontSize: 11,
-                                          fontWeight:
-                                          FontWeight.w500),
+                                        color: grey600,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
                                   ),
                                 ],
                               ],
                             ),
                             const SizedBox(height: 14),
-                            // Stats
                             Row(
                               children: [
                                 _StatItem(
-                                    value: score.toString(),
-                                    label: 'Score'),
+                                  value: score.toString(),
+                                  label: 'Score',
+                                ),
                                 const SizedBox(width: 20),
                                 _StatItem(
-                                    value: followers.toString(),
-                                    label: 'Followers'),
+                                  value: followers.toString(),
+                                  label: 'Followers',
+                                ),
                                 const SizedBox(width: 20),
                                 _StatItem(
-                                    value: following.toString(),
-                                    label: 'Following'),
+                                  value: following.toString(),
+                                  label: 'Following',
+                                ),
+                                const SizedBox(width: 20),
+                                GestureDetector(
+                                  onTap: () {
+                                    if (currentUid != null) {
+                                      _showFriends(currentUid);
+                                    }
+                                  },
+                                  child: _StatItem(
+                                    value: friends.toString(),
+                                    label: 'Friends',
+                                  ),
+                                ),
                               ],
                             ),
+                            if (!_isOwnProfile &&
+                                currentUid != null &&
+                                widget.uid != null)
+                              FutureBuilder<int>(
+                                future: FriendsService.instance
+                                    .getMutualFriendsCount(
+                                  currentUserId: currentUid,
+                                  otherUserId: widget.uid!,
+                                ),
+                                builder: (context, snapshot) {
+                                  if (!snapshot.hasData || snapshot.data == 0) {
+                                    return const SizedBox.shrink();
+                                  }
+
+                                  final count = snapshot.data!;
+
+                                  return Padding(
+                                    padding: const EdgeInsets.only(top: 8),
+                                    child: GestureDetector(
+                                      onTap: () => _showMutualFriends(
+                                        currentUid: currentUid,
+                                        otherUid: widget.uid!,
+                                      ),
+                                      child: Text(
+                                        '$count mutual friend${count == 1 ? '' : 's'}',
+                                        style: const TextStyle(
+                                          color: grey600,
+                                          fontSize: 12,
+                                          decoration: TextDecoration.underline,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
                           ],
                         ),
                       ),
                     ],
                   ),
                 ),
+                if (!_isOwnProfile && currentUid != null && widget.uid != null)
+                  StreamBuilder<String>(
+                    stream: FriendsService.instance.streamRelationshipStatus(
+                      currentUserId: currentUid,
+                      otherUserId: widget.uid!,
+                    ),
+                    builder: (context, snapshot) {
+                      final status = snapshot.data ?? 'none';
 
+                      return Container(
+                        color: white,
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        child: Column(
+                          children: [
+                            if (status == 'incoming')
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: ElevatedButton(
+                                      onPressed: () async {
+                                        try {
+                                          await FriendsService.instance
+                                              .acceptFriendRequest(
+                                            currentUserId: currentUid,
+                                            otherUserId: widget.uid!,
+                                          );
+
+                                          if (!context.mounted) return;
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                'Accepted $username',
+                                              ),
+                                            ),
+                                          );
+                                        } catch (e) {
+                                          if (!context.mounted) return;
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            SnackBar(
+                                              content: Text(e.toString()),
+                                            ),
+                                          );
+                                        }
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: blue,
+                                        foregroundColor: white,
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 12,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        elevation: 0,
+                                      ),
+                                      child: const Text('Accept Request'),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: ElevatedButton(
+                                      onPressed: () async {
+                                        try {
+                                          await FriendsService.instance
+                                              .declineFriendRequest(
+                                            currentUserId: currentUid,
+                                            otherUserId: widget.uid!,
+                                          );
+
+                                          if (!context.mounted) return;
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                'Declined $username',
+                                              ),
+                                            ),
+                                          );
+                                        } catch (e) {
+                                          if (!context.mounted) return;
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            SnackBar(
+                                              content: Text(e.toString()),
+                                            ),
+                                          );
+                                        }
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: grey200,
+                                        foregroundColor: grey900,
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 12,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        elevation: 0,
+                                      ),
+                                      child: const Text('Decline'),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            else
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  onPressed: () async {
+                                    try {
+                                      if (status == 'friends') {
+                                        await FriendsService.instance.removeFriend(
+                                          currentUserId: currentUid,
+                                          friendUserId: widget.uid!,
+                                        );
+                                      } else if (status == 'outgoing') {
+                                        await FriendsService.instance
+                                            .cancelFriendRequest(
+                                          currentUserId: currentUid,
+                                          otherUserId: widget.uid!,
+                                        );
+                                      } else {
+                                        await FriendsService.instance
+                                            .sendFriendRequest(
+                                          currentUserId: currentUid,
+                                          otherUserId: widget.uid!,
+                                        );
+                                      }
+
+                                      if (!context.mounted) return;
+
+                                      String message;
+                                      if (status == 'friends') {
+                                        message = 'Removed $username';
+                                      } else if (status == 'outgoing') {
+                                        message = 'Cancelled request to $username';
+                                      } else {
+                                        message = 'Sent request to $username';
+                                      }
+
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(message),
+                                        ),
+                                      );
+                                    } catch (e) {
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(e.toString()),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: status == 'friends'
+                                        ? grey200
+                                        : status == 'outgoing'
+                                            ? grey200
+                                            : blue,
+                                    foregroundColor: status == 'friends'
+                                        ? grey900
+                                        : status == 'outgoing'
+                                            ? grey900
+                                            : white,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    elevation: 0,
+                                  ),
+                                  child: Text(
+                                    status == 'friends'
+                                        ? 'Remove Friend'
+                                        : status == 'outgoing'
+                                            ? 'Cancel Request'
+                                            : 'Send Request',
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
                 Container(height: 1, color: grey200),
-
-                // ── Bio / meta card ─────────────────────────────────────
                 Container(
                   color: white,
                   width: double.infinity,
-                  padding:
-                  const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Meta chips
                       Wrap(
                         spacing: 14,
                         runSpacing: 6,
                         children: [
                           if (country.isNotEmpty)
                             _MetaChip(
-                                icon: Icons.flag_outlined,
-                                text: country),
+                              icon: Icons.flag_outlined,
+                              text: country,
+                            ),
                           _MetaChip(
                             icon: Icons.calendar_today_outlined,
-                            text: 'Joined ${_formatDate(
-                                profile['createdAt'])}',
+                            text: 'Joined ${_formatDate(profile['createdAt'])}',
                           ),
                         ],
                       ),
-
-                      // Bio
                       if (bio.isNotEmpty) ...[
                         const SizedBox(height: 12),
                         Text(
@@ -231,7 +774,9 @@ class _ProfilePageState extends State<ProfilePage> {
                       ] else ...[
                         const SizedBox(height: 10),
                         Text(
-                          'No bio yet — tap Edit Profile to add one.',
+                          _isOwnProfile
+                              ? 'No bio yet — tap Edit Profile to add one.'
+                              : 'No bio yet.',
                           style: TextStyle(
                             color: grey400,
                             fontSize: 13,
@@ -239,55 +784,69 @@ class _ProfilePageState extends State<ProfilePage> {
                           ),
                         ),
                       ],
-
-                      // Tags
                       if (tags.isNotEmpty) ...[
                         const SizedBox(height: 14),
                         Wrap(
                           spacing: 6,
                           runSpacing: 6,
-                          children: tags
-                              .map((t) => _TagChip(label: t))
-                              .toList(),
+                          children: tags.map((t) => _TagChip(label: t)).toList(),
                         ),
                       ],
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 8),
-
-                // ── Edit profile button ─────────────────────────────────
-                Padding(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 16),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () => _openEdit(profile),
-                      icon: const Icon(Icons.edit_outlined,
-                          size: 16),
-                      label: const Text('Edit Profile'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: blue,
-                        side: const BorderSide(
-                            color: blue, width: 1.5),
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                if (_isOwnProfile) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () => _openEdit(profile),
+                        icon: const Icon(Icons.edit_outlined, size: 16),
+                        label: const Text('Edit Profile'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: blue,
+                          side: const BorderSide(color: blue, width: 1.5),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-
-                const SizedBox(height: 24),
-
-                // ── Tab row ─────────────────────────────────────────────
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _openFriends,
+                        icon: const Icon(Icons.people),
+                        label: Text(
+                          incomingRequests > 0
+                              ? 'Friends ($incomingRequests)'
+                              : 'Friends',
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: blue,
+                          foregroundColor: white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 0,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ] else ...[
+                  const SizedBox(height: 24),
+                ],
                 Padding(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 20),
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Row(
                     children: const [
                       _TabLabel(label: 'Posts', active: true),
@@ -300,37 +859,40 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
                 const SizedBox(height: 4),
                 Container(
-                    height: 2,
-                    color: blue,
-                    margin: const EdgeInsets.symmetric(
-                        horizontal: 20)),
+                  height: 2,
+                  color: blue,
+                  margin: const EdgeInsets.symmetric(horizontal: 20),
+                ),
                 const SizedBox(height: 16),
-
                 const Center(
                   child: Column(
                     children: [
-                      Icon(Icons.grid_off_outlined,
-                          size: 48, color: grey200),
+                      Icon(
+                        Icons.grid_off_outlined,
+                        size: 48,
+                        color: grey200,
+                      ),
                       SizedBox(height: 10),
-                      Text('No posts yet',
-                          style: TextStyle(
-                              color: grey400, fontSize: 14)),
+                      Text(
+                        'No posts yet',
+                        style: TextStyle(
+                          color: grey400,
+                          fontSize: 14,
+                        ),
+                      ),
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 40),
-
-                // ── Log out ─────────────────────────────────────────────
-                Center(
-                  child: TextButton.icon(
-                    onPressed: _logout,
-                    icon: const Icon(Icons.logout, size: 16),
-                    label: const Text('Log out'),
-                    style: TextButton.styleFrom(
-                        foregroundColor: grey600),
+                if (_isOwnProfile)
+                  Center(
+                    child: TextButton.icon(
+                      onPressed: _logout,
+                      icon: const Icon(Icons.logout, size: 16),
+                      label: const Text('Log out'),
+                      style: TextButton.styleFrom(foregroundColor: grey600),
+                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -344,8 +906,18 @@ class _ProfilePageState extends State<ProfilePage> {
     try {
       final dt = (ts as dynamic).toDate() as DateTime;
       const months = [
-        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec'
       ];
       return '${months[dt.month - 1]} ${dt.year}';
     } catch (_) {
@@ -353,10 +925,6 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helper widgets
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _SettingsButton extends StatelessWidget {
   final VoidCallback onTap;
@@ -367,8 +935,7 @@ class _SettingsButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding:
-        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: const Color(0xFFF5F5F5),
           borderRadius: BorderRadius.circular(10),
@@ -377,15 +944,19 @@ class _SettingsButton extends StatelessWidget {
         child: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.settings_outlined,
-                color: Color(0xFF212121), size: 16),
+            Icon(
+              Icons.settings_outlined,
+              color: Color(0xFF212121),
+              size: 16,
+            ),
             SizedBox(width: 5),
             Text(
               'Settings',
               style: TextStyle(
-                  color: Color(0xFF212121),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600),
+                color: Color(0xFF212121),
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),
@@ -404,7 +975,8 @@ class _Avatar extends StatelessWidget {
     return Stack(
       children: [
         Container(
-          width: size, height: size,
+          width: size,
+          height: size,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: const Color(0xFFEEEEEE),
@@ -420,15 +992,24 @@ class _Avatar extends StatelessWidget {
           child: ClipOval(
             child: photoUrl.isNotEmpty
                 ? CachedNetworkImage(
-              imageUrl: photoUrl,
-              fit: BoxFit.cover,
-              placeholder: (_, __) => const Icon(Icons.person,
-                  size: 40, color: Color(0xFF9E9E9E)),
-              errorWidget: (_, __, ___) => const Icon(Icons.person,
-                  size: 40, color: Color(0xFF9E9E9E)),
-            )
-                : const Icon(Icons.person,
-                size: 40, color: Color(0xFF9E9E9E)),
+                    imageUrl: photoUrl,
+                    fit: BoxFit.cover,
+                    placeholder: (_, __) => const Icon(
+                      Icons.person,
+                      size: 40,
+                      color: Color(0xFF9E9E9E),
+                    ),
+                    errorWidget: (_, __, ___) => const Icon(
+                      Icons.person,
+                      size: 40,
+                      color: Color(0xFF9E9E9E),
+                    ),
+                  )
+                : const Icon(
+                    Icons.person,
+                    size: 40,
+                    color: Color(0xFF9E9E9E),
+                  ),
           ),
         ),
       ],
@@ -445,15 +1026,22 @@ class _StatItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(value,
-            style: const TextStyle(
-                color: Color(0xFF212121),
-                fontSize: 16,
-                fontWeight: FontWeight.w800)),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Color(0xFF212121),
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
         const SizedBox(height: 2),
-        Text(label,
-            style: const TextStyle(
-                color: Color(0xFF757575), fontSize: 11)),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Color(0xFF757575),
+            fontSize: 11,
+          ),
+        ),
       ],
     );
   }
@@ -471,9 +1059,13 @@ class _MetaChip extends StatelessWidget {
       children: [
         Icon(icon, size: 13, color: const Color(0xFF9E9E9E)),
         const SizedBox(width: 4),
-        Text(text,
-            style: const TextStyle(
-                color: Color(0xFF757575), fontSize: 12)),
+        Text(
+          text,
+          style: const TextStyle(
+            color: Color(0xFF757575),
+            fontSize: 12,
+          ),
+        ),
       ],
     );
   }
@@ -486,20 +1078,21 @@ class _TagChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding:
-      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: const Color(0xFF1E88E5).withOpacity(0.10),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-            color: const Color(0xFF1E88E5).withOpacity(0.25)),
+          color: const Color(0xFF1E88E5).withOpacity(0.25),
+        ),
       ),
       child: Text(
         label,
         style: const TextStyle(
-            color: Color(0xFF1E88E5),
-            fontSize: 12,
-            fontWeight: FontWeight.w500),
+          color: Color(0xFF1E88E5),
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
       ),
     );
   }
@@ -515,12 +1108,9 @@ class _TabLabel extends StatelessWidget {
     return Text(
       label,
       style: TextStyle(
-        color: active
-            ? const Color(0xFF1E88E5)
-            : const Color(0xFF9E9E9E),
+        color: active ? const Color(0xFF1E88E5) : const Color(0xFF9E9E9E),
         fontSize: 14,
-        fontWeight:
-        active ? FontWeight.w700 : FontWeight.w400,
+        fontWeight: active ? FontWeight.w700 : FontWeight.w400,
       ),
     );
   }

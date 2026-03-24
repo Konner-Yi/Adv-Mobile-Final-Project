@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../profile/profile_page.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   final VoidCallback onOpenMap;
 
   const HomePage({
@@ -9,23 +11,112 @@ class HomePage extends StatelessWidget {
     required this.onOpenMap,
   });
 
-  // ── Theme colours ────────────────────────────────────────────────────────
-  static const Color blue    = Color(0xFF1E88E5);
-  static const Color yellow  = Color(0xFFFFD600);
-  static const Color white   = Color(0xFFFFFFFF);
-  static const Color grey50  = Color(0xFFFAFAFA);
+  @override
+  State<HomePage> createState() => _HomePageState();
+
+  static const Color blue = Color(0xFF1E88E5);
+  static const Color yellow = Color(0xFFFFD600);
+  static const Color white = Color(0xFFFFFFFF);
+  static const Color grey50 = Color(0xFFFAFAFA);
   static const Color grey100 = Color(0xFFF5F5F5);
   static const Color grey200 = Color(0xFFEEEEEE);
   static const Color grey600 = Color(0xFF757575);
   static const Color grey900 = Color(0xFF212121);
+}
+
+class _HomePageState extends State<HomePage> {
+  final TextEditingController _searchController = TextEditingController();
+  String _query = '';
+
+  final List<Map<String, dynamic>> _activityItems = const [
+    {
+      'title': 'New spot reported nearby',
+      'subtitle': '0.3 km away · just now',
+      'type': 'place',
+    },
+    {
+      'title': 'Event happening soon',
+      'subtitle': '0.3 km away · just now',
+      'type': 'event',
+    },
+    {
+      'title': 'New spot reported nearby',
+      'subtitle': '0.3 km away · just now',
+      'type': 'place',
+    },
+    {
+      'title': 'Event happening soon',
+      'subtitle': '0.3 km away · just now',
+      'type': 'event',
+    },
+    {
+      'title': 'Popular food spot nearby',
+      'subtitle': '0.8 km away · 5 min ago',
+      'type': 'food',
+    },
+  ];
+
+  List<Map<String, dynamic>> get _filteredItems {
+    if (_query.isEmpty) return _activityItems;
+
+    return _activityItems.where((item) {
+      final title = (item['title'] ?? '').toString().toLowerCase();
+      final subtitle = (item['subtitle'] ?? '').toString().toLowerCase();
+      final type = (item['type'] ?? '').toString().toLowerCase();
+
+      return title.contains(_query) ||
+          subtitle.contains(_query) ||
+          type.contains(_query);
+    }).toList();
+  }
+
+  Stream<List<Map<String, dynamic>>> _searchUsers(String query) {
+    if (query.isEmpty) {
+      return Stream.value([]);
+    }
+
+    return FirebaseFirestore.instance
+        .collection('users')
+        .snapshots()
+        .map((snapshot) {
+      final lowerQuery = query.toLowerCase();
+
+      final users = snapshot.docs
+          .map((doc) => {
+                'uid': doc.id,
+                ...doc.data(),
+              })
+          .where((user) {
+            final username = (user['username'] ?? '').toString().toLowerCase();
+            final realName = (user['realName'] ?? '').toString().toLowerCase();
+            return username.contains(lowerQuery) || realName.contains(lowerQuery);
+          })
+          .toList();
+
+      users.sort((a, b) {
+        final aUsername = (a['username'] ?? '').toString().toLowerCase();
+        final bUsername = (b['username'] ?? '').toString().toLowerCase();
+        return aUsername.compareTo(bUsername);
+      });
+
+      return users;
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: grey50,
+    final filteredItems = _filteredItems;
 
+    return Scaffold(
+      backgroundColor: HomePage.grey50,
       appBar: AppBar(
-        backgroundColor: white,
+        backgroundColor: HomePage.white,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         title: Row(
@@ -34,18 +125,22 @@ class HomePage extends StatelessWidget {
               width: 28,
               height: 28,
               decoration: const BoxDecoration(
-                color: blue,
+                color: HomePage.blue,
                 shape: BoxShape.circle,
               ),
               child: const Center(
-                child: Icon(Icons.location_on, color: yellow, size: 16),
+                child: Icon(
+                  Icons.location_on,
+                  color: HomePage.yellow,
+                  size: 16,
+                ),
               ),
             ),
             const SizedBox(width: 8),
             const Text(
               'Local Link',
               style: TextStyle(
-                color: grey900,
+                color: HomePage.grey900,
                 fontWeight: FontWeight.bold,
                 fontSize: 20,
                 letterSpacing: 0.3,
@@ -55,30 +150,34 @@ class HomePage extends StatelessWidget {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_outlined, color: grey600),
+            icon: const Icon(
+              Icons.notifications_outlined,
+              color: HomePage.grey600,
+            ),
             onPressed: () {},
           ),
           IconButton(
-            icon: const Icon(Icons.account_circle_outlined, color: grey600),
+            icon: const Icon(
+              Icons.account_circle_outlined,
+              color: HomePage.grey600,
+            ),
             onPressed: () {},
           ),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
-          child: Container(height: 1, color: grey200),
+          child: Container(height: 1, color: HomePage.grey200),
         ),
       ),
-
       body: Column(
         children: [
-          // ── Search bar ───────────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(28),
-                color: white,
-                border: Border.all(color: grey200),
+                color: HomePage.white,
+                border: Border.all(color: HomePage.grey200),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.06),
@@ -88,18 +187,40 @@ class HomePage extends StatelessWidget {
                 ],
               ),
               child: TextField(
+                controller: _searchController,
+                onChanged: (value) {
+                  setState(() => _query = value.trim().toLowerCase());
+                },
                 decoration: InputDecoration(
                   hintText: 'Search places, events, people…',
-                  hintStyle: const TextStyle(color: grey600, fontSize: 14),
-                  prefixIcon: const Icon(Icons.search, color: blue),
-                  suffixIcon: Container(
-                    margin: const EdgeInsets.all(6),
-                    decoration: const BoxDecoration(
-                      color: yellow,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.tune, color: grey900, size: 18),
+                  hintStyle: const TextStyle(
+                    color: HomePage.grey600,
+                    fontSize: 14,
                   ),
+                  prefixIcon: const Icon(Icons.search, color: HomePage.blue),
+                  suffixIcon: _query.isEmpty
+                      ? Container(
+                          margin: const EdgeInsets.all(6),
+                          decoration: const BoxDecoration(
+                            color: HomePage.yellow,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.tune,
+                            color: HomePage.grey900,
+                            size: 18,
+                          ),
+                        )
+                      : IconButton(
+                          icon: const Icon(
+                            Icons.close,
+                            color: HomePage.grey600,
+                          ),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _query = '');
+                          },
+                        ),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 16,
@@ -110,45 +231,154 @@ class HomePage extends StatelessWidget {
             ),
           ),
 
-          // ── Quick-action chips ───────────────────────────────────────────
+          if (_query.isNotEmpty)
+            StreamBuilder<List<Map<String, dynamic>>>(
+              stream: _searchUsers(_query),
+              builder: (context, snapshot) {
+                final users = snapshot.data ?? [];
+
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Padding(
+                    padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: SizedBox(
+                      height: 80,
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          color: HomePage.blue,
+                        ),
+                      ),
+                    ),
+                  );
+                }
+
+                if (users.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+
+                return Container(
+                  margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    color: HomePage.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: HomePage.grey200),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: users.length > 5 ? 5 : users.length,
+                    separatorBuilder: (_, __) => Divider(
+                      height: 1,
+                      color: HomePage.grey200,
+                    ),
+                    itemBuilder: (context, index) {
+                      final user = users[index];
+                      final uid = (user['uid'] ?? '').toString();
+                      final username = (user['username'] ?? 'User').toString();
+                      final realName = (user['realName'] ?? '').toString();
+
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: HomePage.grey200,
+                          backgroundImage: (user['photoUrl'] ?? '')
+                                  .toString()
+                                  .isNotEmpty
+                              ? NetworkImage((user['photoUrl'] ?? '').toString())
+                              : null,
+                          child: (user['photoUrl'] ?? '').toString().isEmpty
+                              ? const Icon(
+                                  Icons.person,
+                                  color: HomePage.grey600,
+                                )
+                              : null,
+                        ),
+                        title: Text(
+                          username,
+                          style: const TextStyle(
+                            color: HomePage.grey900,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: realName.isNotEmpty
+                            ? Text(
+                                realName,
+                                style: const TextStyle(
+                                  color: HomePage.grey600,
+                                  fontSize: 12,
+                                ),
+                              )
+                            : null,
+                        trailing: const Icon(
+                          Icons.chevron_right,
+                          color: HomePage.grey600,
+                          size: 18,
+                        ),
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ProfilePage(uid: uid),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                );
+              },
+            ),
+
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
-              children: [
-                _Chip(label: 'Near Me',  icon: Icons.near_me,        active: true),
-                _Chip(label: 'Events',   icon: Icons.event,           active: false),
-                _Chip(label: 'Friends',  icon: Icons.people_outline,  active: false),
-                _Chip(label: 'Food',     icon: Icons.restaurant,      active: false),
-                _Chip(label: 'Traffic',  icon: Icons.traffic,         active: false),
+              children: const [
+                _Chip(label: 'Near Me', icon: Icons.near_me, active: true),
+                _Chip(label: 'Events', icon: Icons.event, active: false),
+                _Chip(
+                  label: 'Friends',
+                  icon: Icons.people_outline,
+                  active: false,
+                ),
+                _Chip(label: 'Food', icon: Icons.restaurant, active: false),
+                _Chip(label: 'Traffic', icon: Icons.traffic, active: false),
               ],
             ),
           ),
 
-          // ── Open Map CTA ─────────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: InkWell(
               onTap: () {
                 HapticFeedback.selectionClick();
-                onOpenMap();
+                widget.onOpenMap();
               },
               borderRadius: BorderRadius.circular(16),
               child: Container(
                 height: 160,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
-                  color: blue,
+                  color: HomePage.blue,
                 ),
                 child: Stack(
                   children: [
-                    // Yellow accent bar
                     Positioned(
-                      left: 0, top: 0, bottom: 0,
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
                       child: Container(
                         width: 6,
                         decoration: const BoxDecoration(
-                          color: yellow,
+                          color: HomePage.yellow,
                           borderRadius: BorderRadius.only(
                             topLeft: Radius.circular(16),
                             bottomLeft: Radius.circular(16),
@@ -162,12 +392,16 @@ class HomePage extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.map, color: white, size: 32),
+                          const Icon(
+                            Icons.map,
+                            color: HomePage.white,
+                            size: 32,
+                          ),
                           const SizedBox(height: 8),
                           const Text(
                             'Open Live Map',
                             style: TextStyle(
-                              color: white,
+                              color: HomePage.white,
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
                             ),
@@ -176,7 +410,7 @@ class HomePage extends StatelessWidget {
                           Text(
                             'See what\'s happening around you',
                             style: TextStyle(
-                              color: white.withOpacity(0.85),
+                              color: HomePage.white.withOpacity(0.85),
                               fontSize: 13,
                             ),
                           ),
@@ -188,16 +422,17 @@ class HomePage extends StatelessWidget {
                       bottom: 16,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 8,
+                          horizontal: 14,
+                          vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color: yellow,
+                          color: HomePage.yellow,
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: const Text(
                           'Explore →',
                           style: TextStyle(
-                            color: grey900,
+                            color: HomePage.grey900,
                             fontWeight: FontWeight.bold,
                             fontSize: 13,
                           ),
@@ -210,47 +445,71 @@ class HomePage extends StatelessWidget {
             ),
           ),
 
-          // ── Feed header ──────────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Nearby Activity',
-                  style: TextStyle(
-                    color: grey900,
+                Text(
+                  _query.isEmpty ? 'Nearby Activity' : 'Search Results',
+                  style: const TextStyle(
+                    color: HomePage.grey900,
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 TextButton(
                   onPressed: () {},
-                  child: const Text(
-                    'See all',
-                    style: TextStyle(color: blue, fontSize: 13),
+                  child: Text(
+                    _query.isEmpty ? 'See all' : '${filteredItems.length} found',
+                    style: const TextStyle(
+                      color: HomePage.blue,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
 
-          // ── Placeholder feed ─────────────────────────────────────────────
           Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-              itemCount: 5,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (context, i) => _FeedCard(index: i),
-            ),
+            child: filteredItems.isEmpty
+                ? const Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.search_off,
+                          size: 48,
+                          color: HomePage.grey600,
+                        ),
+                        SizedBox(height: 10),
+                        Text(
+                          'No results found',
+                          style: TextStyle(
+                            color: HomePage.grey600,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                    itemCount: filteredItems.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (context, i) => _FeedCard(
+                      title: filteredItems[i]['title'] as String,
+                      subtitle: filteredItems[i]['subtitle'] as String,
+                      type: filteredItems[i]['type'] as String,
+                    ),
+                  ),
           ),
         ],
       ),
     );
   }
 }
-
-// ── Helper widgets ────────────────────────────────────────────────────────────
 
 class _Chip extends StatelessWidget {
   final String label;
@@ -302,19 +561,46 @@ class _Chip extends StatelessWidget {
 }
 
 class _FeedCard extends StatelessWidget {
-  final int index;
-  const _FeedCard({required this.index});
+  final String title;
+  final String subtitle;
+  final String type;
 
-  static const Color blue    = Color(0xFF1E88E5);
-  static const Color yellow  = Color(0xFFFFD600);
-  static const Color white   = Color(0xFFFFFFFF);
-  static const Color grey100 = Color(0xFFF5F5F5);
+  const _FeedCard({
+    required this.title,
+    required this.subtitle,
+    required this.type,
+  });
+
+  static const Color blue = Color(0xFF1E88E5);
+  static const Color yellow = Color(0xFFFFD600);
+  static const Color white = Color(0xFFFFFFFF);
   static const Color grey200 = Color(0xFFEEEEEE);
   static const Color grey600 = Color(0xFF757575);
   static const Color grey900 = Color(0xFF212121);
 
   @override
   Widget build(BuildContext context) {
+    final isPlace = type == 'place';
+    final isFood = type == 'food';
+
+    IconData icon;
+    Color iconBg;
+    Color iconColor;
+
+    if (isFood) {
+      icon = Icons.restaurant;
+      iconBg = yellow.withOpacity(0.25);
+      iconColor = grey900;
+    } else if (isPlace) {
+      icon = Icons.place;
+      iconBg = blue.withOpacity(0.15);
+      iconColor = blue;
+    } else {
+      icon = Icons.event;
+      iconBg = yellow.withOpacity(0.25);
+      iconColor = grey900;
+    }
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -333,10 +619,10 @@ class _FeedCard extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 20,
-            backgroundColor: index.isEven ? blue.withOpacity(0.15) : yellow.withOpacity(0.25),
+            backgroundColor: iconBg,
             child: Icon(
-              index.isEven ? Icons.place : Icons.event,
-              color: index.isEven ? blue : grey900,
+              icon,
+              color: iconColor,
               size: 18,
             ),
           ),
@@ -346,7 +632,7 @@ class _FeedCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  index.isEven ? 'New spot reported nearby' : 'Event happening soon',
+                  title,
                   style: const TextStyle(
                     color: grey900,
                     fontWeight: FontWeight.w600,
@@ -354,9 +640,12 @@ class _FeedCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 2),
-                const Text(
-                  '0.3 km away · just now',
-                  style: TextStyle(color: grey600, fontSize: 12),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: grey600,
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
