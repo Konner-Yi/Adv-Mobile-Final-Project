@@ -23,69 +23,77 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
   static const Color _accent  = Color(0xFF1E88E5);
   static const Color _yellow  = Color(0xFFFFD600);
 
-  late int _likes;
-  late int _comments;
-  late int _reposts;
   bool _liked    = false;
   bool _reposted = false;
 
-  final String _uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+  final String _uid      = FirebaseAuth.instance.currentUser?.uid ?? '';
+  final bool   _isGuest  = FirebaseAuth.instance.currentUser == null;
 
   @override
   void initState() {
     super.initState();
-    _likes    = widget.post['likes']   ?? 0;
-    _comments = widget.post['comments'] ?? 0;
-    _reposts  = widget.post['reposts'] ?? 0;
-    _checkIfLiked();
+    if (!_isGuest) {
+      _checkIfLiked();
+      _checkIfReposted();
+    }
   }
 
-  // ── Check if current user already liked this post ──────
   Future<void> _checkIfLiked() async {
     final doc = await FirebaseFirestore.instance
-        .collection('posts')
-        .doc(widget.postId)
-        .collection('likedBy')
-        .doc(_uid)
+        .collection('posts').doc(widget.postId)
+        .collection('likedBy').doc(_uid)
         .get();
     if (mounted) setState(() => _liked = doc.exists);
   }
 
+  Future<void> _checkIfReposted() async {
+    final doc = await FirebaseFirestore.instance
+        .collection('posts').doc(widget.postId)
+        .collection('repostedBy').doc(_uid)
+        .get();
+    if (mounted) setState(() => _reposted = doc.exists);
+  }
+
   // ── Like toggle ────────────────────────────────────────
   Future<void> _toggleLike() async {
+    if (_isGuest) { _snackLoginRequired(); return; }
     HapticFeedback.lightImpact();
+
     final ref = FirebaseFirestore.instance
-        .collection('posts')
-        .doc(widget.postId);
+        .collection('posts').doc(widget.postId);
 
     if (_liked) {
       await ref.update({'likes': FieldValue.increment(-1)});
       await ref.collection('likedBy').doc(_uid).delete();
-      setState(() { _liked = false; _likes--; });
+      setState(() => _liked = false);
     } else {
       await ref.update({'likes': FieldValue.increment(1)});
-      await ref.collection('likedBy').doc(_uid).set({'likedAt': FieldValue.serverTimestamp()});
-      setState(() { _liked = true; _likes++; });
+      await ref.collection('likedBy').doc(_uid)
+          .set({'likedAt': FieldValue.serverTimestamp()});
+      setState(() => _liked = true);
     }
   }
 
-  // ── Repost toggle ──────────────────────────────────────
+  // ── Repost toggle (per-user tracked) ──────────────────
   Future<void> _toggleRepost() async {
+    if (_isGuest) { _snackLoginRequired(); return; }
     HapticFeedback.lightImpact();
+
     final ref = FirebaseFirestore.instance
-        .collection('posts')
-        .doc(widget.postId);
+        .collection('posts').doc(widget.postId);
 
     if (_reposted) {
       await ref.update({'reposts': FieldValue.increment(-1)});
-      setState(() { _reposted = false; _reposts--; });
+      await ref.collection('repostedBy').doc(_uid).delete();
+      setState(() => _reposted = false);
     } else {
       await ref.update({'reposts': FieldValue.increment(1)});
-      setState(() { _reposted = true; _reposts++; });
+      await ref.collection('repostedBy').doc(_uid)
+          .set({'repostedAt': FieldValue.serverTimestamp()});
+      setState(() => _reposted = true);
     }
   }
 
-  // ── Comments sheet ─────────────────────────────────────
   void _openComments() {
     showModalBottomSheet(
       context: context,
@@ -98,13 +106,19 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
     );
   }
 
+  void _snackLoginRequired() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Sign in to interact with posts.')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final post = widget.post;
-    final avatarUrl  = post['avatarUrl']  as String? ?? '';
-    final username   = post['username']   as String? ?? 'Anonymous';
-    final imageUrl   = post['imageUrl']   as String? ?? '';
-    final caption    = post['caption']    as String? ?? '';
+    final post       = widget.post;
+    final avatarUrl  = post['avatarUrl'] as String? ?? '';
+    final username   = post['username']  as String? ?? 'Anonymous';
+    final imageUrl   = post['imageUrl']  as String? ?? '';
+    final caption    = post['caption']   as String? ?? '';
 
     return Container(
       decoration: const BoxDecoration(
@@ -117,15 +131,14 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
           // ── Drag handle ──
           Container(
             margin: const EdgeInsets.only(top: 10, bottom: 6),
-            width: 40,
-            height: 4,
+            width: 40, height: 4,
             decoration: BoxDecoration(
               color: Colors.white24,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
 
-          // ── Header: avatar + username ──
+          // ── Header ──
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             child: Row(
@@ -133,8 +146,8 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
                 CircleAvatar(
                   radius: 20,
                   backgroundColor: _surface,
-                  backgroundImage:
-                  avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+                  backgroundImage: avatarUrl.isNotEmpty
+                      ? NetworkImage(avatarUrl) : null,
                   child: avatarUrl.isEmpty
                       ? const Icon(Icons.person, color: Colors.white54)
                       : null,
@@ -152,7 +165,7 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
             ),
           ),
 
-          // ── Post image ──
+          // ── Image ──
           if (imageUrl.isNotEmpty)
             Image.network(
               imageUrl,
@@ -162,44 +175,59 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
               loadingBuilder: (_, child, progress) => progress == null
                   ? child
                   : Container(
-                height: 320,
-                color: _surface,
+                height: 320, color: _surface,
                 child: const Center(
                   child: CircularProgressIndicator(color: _accent),
                 ),
               ),
             ),
 
-          // ── Action bar ──
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
-              children: [
-                // Like
-                _ActionButton(
-                  icon: _liked ? Icons.favorite : Icons.favorite_border,
-                  color: _liked ? Colors.redAccent : Colors.white70,
-                  count: _likes,
-                  onTap: _toggleLike,
+          // ── Live action bar (StreamBuilder for real-time counts) ──
+          StreamBuilder<DocumentSnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('posts')
+                .doc(widget.postId)
+                .snapshots(),
+            builder: (context, snapshot) {
+              final data = snapshot.data?.data() as Map<String, dynamic>?;
+              final likes    = data?['likes']    ?? 0;
+              final comments = data?['comments'] ?? 0;
+              final reposts  = data?['reposts']  ?? 0;
+
+              return Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 8),
+                child: Row(
+                  children: [
+                    // Like
+                    _ActionButton(
+                      icon: _liked
+                          ? Icons.favorite
+                          : Icons.favorite_border,
+                      color: _liked ? Colors.redAccent : Colors.white70,
+                      count: likes,
+                      onTap: _toggleLike,
+                    ),
+                    const SizedBox(width: 4),
+                    // Comment
+                    _ActionButton(
+                      icon: Icons.chat_bubble_outline,
+                      color: Colors.white70,
+                      count: comments,
+                      onTap: _openComments,
+                    ),
+                    const SizedBox(width: 4),
+                    // Repost
+                    _ActionButton(
+                      icon: Icons.repeat,
+                      color: _reposted ? _yellow : Colors.white70,
+                      count: reposts,
+                      onTap: _toggleRepost,
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 4),
-                // Comment
-                _ActionButton(
-                  icon: Icons.chat_bubble_outline,
-                  color: Colors.white70,
-                  count: _comments,
-                  onTap: _openComments,
-                ),
-                const SizedBox(width: 4),
-                // Repost
-                _ActionButton(
-                  icon: Icons.repeat,
-                  color: _reposted ? _yellow : Colors.white70,
-                  count: _reposts,
-                  onTap: _toggleRepost,
-                ),
-              ],
-            ),
+              );
+            },
           ),
 
           // ── Caption ──
@@ -239,7 +267,7 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
   }
 }
 
-// ── Small action button widget ─────────────────────────────────────────────
+// ── Action button ──────────────────────────────────────────────────────────
 class _ActionButton extends StatelessWidget {
   final IconData icon;
   final Color color;
@@ -279,7 +307,7 @@ class _ActionButton extends StatelessWidget {
   }
 }
 
-// ── Comments bottom sheet ──────────────────────────────────────────────────
+// ── Comments sheet ─────────────────────────────────────────────────────────
 class _CommentsSheet extends StatefulWidget {
   final String postId;
   const _CommentsSheet({required this.postId});
@@ -294,35 +322,79 @@ class _CommentsSheetState extends State<_CommentsSheet> {
   static const Color _accent  = Color(0xFF1E88E5);
 
   final _commentController = TextEditingController();
-  bool _sending = false;
+  bool   _sending          = false;
+  String? _replyToId;
+  String? _replyToUsername;
+
+  final String? _uid      = FirebaseAuth.instance.currentUser?.uid;
+  final String? _username = FirebaseAuth.instance.currentUser?.displayName;
+  final bool    _isGuest  = FirebaseAuth.instance.currentUser == null;
+
+  void _setReply(String commentId, String username) {
+    setState(() {
+      _replyToId       = commentId;
+      _replyToUsername = username;
+    });
+    // Focus the text field
+    FocusScope.of(context).requestFocus(FocusNode());
+  }
+
+  void _clearReply() {
+    setState(() {
+      _replyToId       = null;
+      _replyToUsername = null;
+    });
+  }
 
   Future<void> _sendComment() async {
     final text = _commentController.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || _isGuest) return;
 
     setState(() => _sending = true);
-    final user = FirebaseAuth.instance.currentUser;
 
-    await FirebaseFirestore.instance
-        .collection('posts')
-        .doc(widget.postId)
-        .collection('comments')
-        .add({
-      'userId':    user?.uid ?? '',
-      'username':  user?.displayName ?? 'Anonymous',
-      'avatarUrl': user?.photoURL ?? '',
-      'text':      text,
-      'createdAt': FieldValue.serverTimestamp(),
+    final user = FirebaseAuth.instance.currentUser!;
+    final batch = FirebaseFirestore.instance.batch();
+
+    final commentRef = FirebaseFirestore.instance
+        .collection('posts').doc(widget.postId)
+        .collection('comments').doc();
+
+    batch.set(commentRef, {
+      'userId':      user.uid,
+      'username':    user.displayName ?? 'Anonymous',
+      'avatarUrl':   user.photoURL ?? '',
+      'text':        text,
+      'replyToId':   _replyToId,   // null if top-level comment
+      'createdAt':   FieldValue.serverTimestamp(),
     });
 
-    // Increment comment count on the post
-    await FirebaseFirestore.instance
-        .collection('posts')
-        .doc(widget.postId)
-        .update({'comments': FieldValue.increment(1)});
+    // Increment comment count
+    batch.update(
+      FirebaseFirestore.instance.collection('posts').doc(widget.postId),
+      {'comments': FieldValue.increment(1)},
+    );
+
+    await batch.commit();
 
     _commentController.clear();
+    _clearReply();
     setState(() => _sending = false);
+  }
+
+  Future<void> _deleteComment(String commentId) async {
+    final batch = FirebaseFirestore.instance.batch();
+
+    batch.delete(
+      FirebaseFirestore.instance
+          .collection('posts').doc(widget.postId)
+          .collection('comments').doc(commentId),
+    );
+    batch.update(
+      FirebaseFirestore.instance.collection('posts').doc(widget.postId),
+      {'comments': FieldValue.increment(-1)},
+    );
+
+    await batch.commit();
   }
 
   @override
@@ -334,11 +406,10 @@ class _CommentsSheetState extends State<_CommentsSheet> {
       expand: false,
       builder: (_, scrollController) => Column(
         children: [
-          // Handle
+          // ── Handle ──
           Container(
             margin: const EdgeInsets.only(top: 10, bottom: 8),
-            width: 40,
-            height: 4,
+            width: 40, height: 4,
             decoration: BoxDecoration(
               color: Colors.white24,
               borderRadius: BorderRadius.circular(2),
@@ -356,12 +427,11 @@ class _CommentsSheetState extends State<_CommentsSheet> {
 
           const Divider(color: Colors.white12, height: 20),
 
-          // Comments list
+          // ── Live comments list ──
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
-                  .collection('posts')
-                  .doc(widget.postId)
+                  .collection('posts').doc(widget.postId)
                   .collection('comments')
                   .orderBy('createdAt', descending: false)
                   .snapshots(),
@@ -371,8 +441,15 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                     child: CircularProgressIndicator(color: _accent),
                   );
                 }
-                final docs = snapshot.data!.docs;
-                if (docs.isEmpty) {
+
+                // Separate top-level comments from replies
+                final allDocs = snapshot.data!.docs;
+                final topLevel = allDocs
+                    .where((d) =>
+                (d.data() as Map)['replyToId'] == null)
+                    .toList();
+
+                if (topLevel.isEmpty) {
                   return const Center(
                     child: Text(
                       'No comments yet. Be first!',
@@ -380,40 +457,60 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                     ),
                   );
                 }
+
                 return ListView.builder(
                   controller: scrollController,
-                  itemCount: docs.length,
+                  itemCount: topLevel.length,
                   itemBuilder: (_, i) {
-                    final c = docs[i].data() as Map<String, dynamic>;
-                    return ListTile(
-                      leading: CircleAvatar(
-                        radius: 16,
-                        backgroundColor: _surface,
-                        backgroundImage: (c['avatarUrl'] as String?)
-                            ?.isNotEmpty ==
-                            true
-                            ? NetworkImage(c['avatarUrl'])
-                            : null,
-                        child: (c['avatarUrl'] as String?)?.isEmpty != false
-                            ? const Icon(Icons.person,
-                            color: Colors.white54, size: 16)
-                            : null,
-                      ),
-                      title: Text(
-                        c['username'] ?? 'Anonymous',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
+                    final doc  = topLevel[i];
+                    final c    = doc.data() as Map<String, dynamic>;
+                    final isMe = c['userId'] == _uid;
+
+                    // Replies to this comment
+                    final replies = allDocs
+                        .where((d) =>
+                    (d.data() as Map)['replyToId'] == doc.id)
+                        .toList();
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // ── Top-level comment ──
+                        _CommentTile(
+                          commentId:  doc.id,
+                          data:       c,
+                          isMe:       isMe,
+                          isGuest:    _isGuest,
+                          onReply:    () => _setReply(doc.id, c['username'] ?? ''),
+                          onDelete:   isMe
+                              ? () => _deleteComment(doc.id)
+                              : null,
                         ),
-                      ),
-                      subtitle: Text(
-                        c['text'] ?? '',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 13,
-                        ),
-                      ),
+
+                        // ── Replies ──
+                        if (replies.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 48),
+                            child: Column(
+                              children: replies.map((r) {
+                                final rd    = r.data() as Map<String, dynamic>;
+                                final rIsMe = rd['userId'] == _uid;
+                                return _CommentTile(
+                                  commentId: r.id,
+                                  data:      rd,
+                                  isMe:      rIsMe,
+                                  isGuest:   _isGuest,
+                                  isReply:   true,
+                                  onReply:   () => _setReply(
+                                      doc.id, rd['username'] ?? ''),
+                                  onDelete: rIsMe
+                                      ? () => _deleteComment(r.id)
+                                      : null,
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                      ],
                     );
                   },
                 );
@@ -421,7 +518,32 @@ class _CommentsSheetState extends State<_CommentsSheet> {
             ),
           ),
 
-          // Comment input
+          // ── Reply indicator ──
+          if (_replyToUsername != null)
+            Container(
+              color: _surface,
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 16, vertical: 6),
+              child: Row(
+                children: [
+                  const Icon(Icons.reply, color: _accent, size: 16),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Replying to @$_replyToUsername',
+                    style: const TextStyle(
+                        color: Colors.white60, fontSize: 12),
+                  ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: _clearReply,
+                    child: const Icon(Icons.close,
+                        color: Colors.white38, size: 16),
+                  ),
+                ],
+              ),
+            ),
+
+          // ── Input ──
           Container(
             color: _bg,
             padding: EdgeInsets.fromLTRB(
@@ -431,10 +553,16 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                 Expanded(
                   child: TextField(
                     controller: _commentController,
+                    enabled: !_isGuest,
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
-                      hintText: 'Add a comment...',
-                      hintStyle: const TextStyle(color: Colors.white30),
+                      hintText: _isGuest
+                          ? 'Sign in to comment...'
+                          : _replyToUsername != null
+                          ? 'Reply to @$_replyToUsername...'
+                          : 'Add a comment...',
+                      hintStyle:
+                      const TextStyle(color: Colors.white30),
                       filled: true,
                       fillColor: _surface,
                       contentPadding: const EdgeInsets.symmetric(
@@ -449,14 +577,13 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                 const SizedBox(width: 8),
                 _sending
                     ? const SizedBox(
-                  width: 24,
-                  height: 24,
+                  width: 24, height: 24,
                   child: CircularProgressIndicator(
                       strokeWidth: 2, color: _accent),
                 )
                     : IconButton(
                   icon: const Icon(Icons.send, color: _accent),
-                  onPressed: _sendComment,
+                  onPressed: _isGuest ? null : _sendComment,
                 ),
               ],
             ),
@@ -470,5 +597,105 @@ class _CommentsSheetState extends State<_CommentsSheet> {
   void dispose() {
     _commentController.dispose();
     super.dispose();
+  }
+}
+
+// ── Single comment tile ────────────────────────────────────────────────────
+class _CommentTile extends StatelessWidget {
+  final String              commentId;
+  final Map<String, dynamic> data;
+  final bool                isMe;
+  final bool                isGuest;
+  final bool                isReply;
+  final VoidCallback        onReply;
+  final VoidCallback?       onDelete;
+
+  static const Color _surface = Color(0xFF1A1A1A);
+  static const Color _accent  = Color(0xFF1E88E5);
+
+  const _CommentTile({
+    required this.commentId,
+    required this.data,
+    required this.isMe,
+    required this.isGuest,
+    required this.onReply,
+    this.onDelete,
+    this.isReply = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final avatarUrl = data['avatarUrl'] as String? ?? '';
+    final username  = data['username']  as String? ?? 'Anonymous';
+    final text      = data['text']      as String? ?? '';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: isReply ? 14 : 18,
+            backgroundColor: _surface,
+            backgroundImage: avatarUrl.isNotEmpty
+                ? NetworkImage(avatarUrl) : null,
+            child: avatarUrl.isEmpty
+                ? Icon(Icons.person,
+                color: Colors.white54,
+                size: isReply ? 14 : 18)
+                : null,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Username + delete button
+                Row(
+                  children: [
+                    Text(
+                      username,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const Spacer(),
+                    if (onDelete != null)
+                      GestureDetector(
+                        onTap: onDelete,
+                        child: const Icon(Icons.delete_outline,
+                            color: Colors.white30, size: 16),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                // Comment text
+                Text(
+                  text,
+                  style: const TextStyle(
+                      color: Colors.white70, fontSize: 13),
+                ),
+                const SizedBox(height: 4),
+                // Reply button
+                if (!isGuest)
+                  GestureDetector(
+                    onTap: onReply,
+                    child: const Text(
+                      'Reply',
+                      style: TextStyle(
+                        color: _accent,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
