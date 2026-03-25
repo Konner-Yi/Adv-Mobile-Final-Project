@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:local_link_web/features/home/map_preview_widget.dart';
 
 class HomePage extends StatelessWidget {
   final VoidCallback onOpenMap;
@@ -126,87 +127,11 @@ class HomePage extends StatelessWidget {
           ),
 
           // ── Open Map CTA ─────────────────────────────────────────────────
+          // ── Map preview ──────────────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: InkWell(
-              onTap: () {
-                HapticFeedback.selectionClick();
-                onOpenMap();
-              },
-              borderRadius: BorderRadius.circular(16),
-              child: Container(
-                height: 160,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  color: blue,
-                ),
-                child: Stack(
-                  children: [
-                    // Yellow accent bar
-                    Positioned(
-                      left: 0, top: 0, bottom: 0,
-                      child: Container(
-                        width: 6,
-                        decoration: const BoxDecoration(
-                          color: yellow,
-                          borderRadius: BorderRadius.only(
-                            topLeft: Radius.circular(16),
-                            bottomLeft: Radius.circular(16),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.map, color: white, size: 32),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Open Live Map',
-                            style: TextStyle(
-                              color: white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'See what\'s happening around you',
-                            style: TextStyle(
-                              color: white.withOpacity(0.85),
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Positioned(
-                      right: 16,
-                      bottom: 16,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: yellow,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Text(
-                          'Explore →',
-                          style: TextStyle(
-                            color: grey900,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            child: MapPreviewWidget(
+              onExpand: onOpenMap,
             ),
           ),
 

@@ -218,6 +218,9 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_compass/flutter_compass.dart';
+import 'package:local_link_web/features/posts/create_post_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:local_link_web/features/posts/post_bottom_sheet.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({Key? key}) : super(key: key);
@@ -249,6 +252,9 @@ class _MapScreenState extends State<MapPage> with SingleTickerProviderStateMixin
   late final AnimationController _pulseController;
   late final Animation<double> _pulseAnim;
 
+  // Add this with your other state variables
+  List<Map<String, dynamic>> _firestorePosts = [];
+
   StreamSubscription<Position>? _positionStream;
   StreamSubscription<CompassEvent>? _compassStream;
 
@@ -256,6 +262,7 @@ class _MapScreenState extends State<MapPage> with SingleTickerProviderStateMixin
   void initState() {
     super.initState();
     _initLocation();
+    _loadPosts();
 
     _pulseController = AnimationController(
       vsync: this,
@@ -264,6 +271,80 @@ class _MapScreenState extends State<MapPage> with SingleTickerProviderStateMixin
 
     _pulseAnim = Tween<double>(begin: 1.0, end: 1.12).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+  }
+
+  Future<void> _loadPosts() async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('posts')
+        .orderBy('createdAt', descending: true)
+        .get();
+
+    final markers = <Marker>[];
+    final posts   = <Map<String, dynamic>>[];
+
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      final lat  = data['lat'] as double?;
+      final lng  = data['lng'] as double?;
+      if (lat == null || lng == null) continue;
+
+      final point = LatLng(lat, lng);
+      posts.add({...data, 'postId': doc.id});
+
+      markers.add(
+        Marker(
+          point: point,
+          width: 44,
+          height: 44,
+          child: GestureDetector(
+            onTap: () => _openPost({...data, 'postId': doc.id}),
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E88E5),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 6,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: ClipOval(
+                child: (data['imageUrl'] as String?)?.isNotEmpty == true
+                    ? Image.network(
+                  data['imageUrl'],
+                  fit: BoxFit.cover,
+                )
+                    : const Icon(Icons.photo, color: Colors.white, size: 22),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (mounted) {
+      setState(() {
+        _postMarkers
+          ..clear()
+          ..addAll(markers);
+        _firestorePosts = posts;
+      });
+    }
+  }
+
+  void _openPost(Map<String, dynamic> post) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => PostBottomSheet(
+        post: post,
+        postId: post['postId'] as String,
+      ),
     );
   }
 
@@ -307,21 +388,20 @@ class _MapScreenState extends State<MapPage> with SingleTickerProviderStateMixin
     setState(() => _isPlacingMarker = !_isPlacingMarker);
   }
 
-  void _onMapTap(TapPosition tapPosition, LatLng point) {
-    if (!_isPlacingMarker) return; // ← only place when mode is active
-
+  // Replace _onMapTap entirely
+  void _onMapTap(TapPosition tapPosition, LatLng point) async {
+    if (!_isPlacingMarker) return;
     HapticFeedback.mediumImpact();
-    setState(() {
-      _postMarkers.add(
-        Marker(
-          point: point,
-          width: 40,
-          height: 40,
-          child: const Icon(Icons.location_on, size: 40, color: Colors.red),
-        ),
-      );
-      _isPlacingMarker = false; // auto-deactivate after placing one marker
-    });
+    setState(() => _isPlacingMarker = false);
+
+    final posted = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CreatePostScreen(pinnedLocation: point),
+      ),
+    );
+
+    if (posted == true) _loadPosts(); // ← reload so new post appears
   }
 
   Widget _buildUserMarker() {
