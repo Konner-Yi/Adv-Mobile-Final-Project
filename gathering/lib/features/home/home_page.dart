@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:geolocator/geolocator.dart';
+import '../../core/services/auth_service.dart';
+import '../friends/friends_page.dart';
 import '../profile/profile_page.dart';
 
 class HomePage extends StatefulWidget {
@@ -27,6 +30,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
+  bool _savingLocation = false;
 
   final List<Map<String, dynamic>> _activityItems = const [
     {
@@ -56,6 +60,12 @@ class _HomePageState extends State<HomePage> {
     },
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    _saveCurrentUserLocation();
+  }
+
   List<Map<String, dynamic>> get _filteredItems {
     if (_query.isEmpty) return _activityItems;
 
@@ -68,6 +78,44 @@ class _HomePageState extends State<HomePage> {
           subtitle.contains(_query) ||
           type.contains(_query);
     }).toList();
+  }
+
+  Future<void> _saveCurrentUserLocation() async {
+    if (_savingLocation) return;
+
+    final user = AuthService.instance.currentUser;
+    if (user == null) return;
+
+    _savingLocation = true;
+
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return;
+
+      LocationPermission permission = await Geolocator.checkPermission();
+
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      await AuthService.instance.updateUserProfile({
+        'latitude': position.latitude,
+        'longitude': position.longitude,
+        'locationUpdatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {
+    } finally {
+      _savingLocation = false;
+    }
   }
 
   Stream<List<Map<String, dynamic>>> _searchUsers(String query) {
@@ -107,6 +155,16 @@ class _HomePageState extends State<HomePage> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _openFriendsPage() {
+    HapticFeedback.selectionClick();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const FriendsPage(),
+      ),
+    );
   }
 
   @override
@@ -230,7 +288,6 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
           ),
-
           if (_query.isNotEmpty)
             StreamBuilder<List<Map<String, dynamic>>>(
               stream: _searchUsers(_query),
@@ -336,25 +393,26 @@ class _HomePageState extends State<HomePage> {
                 );
               },
             ),
-
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
-              children: const [
-                _Chip(label: 'Near Me', icon: Icons.near_me, active: true),
-                _Chip(label: 'Events', icon: Icons.event, active: false),
-                _Chip(
-                  label: 'Friends',
-                  icon: Icons.people_outline,
-                  active: false,
+              children: [
+                const _Chip(label: 'Near Me', icon: Icons.near_me, active: true),
+                const _Chip(label: 'Events', icon: Icons.event, active: false),
+                GestureDetector(
+                  onTap: _openFriendsPage,
+                  child: const _Chip(
+                    label: 'Friends',
+                    icon: Icons.people_outline,
+                    active: false,
+                  ),
                 ),
-                _Chip(label: 'Food', icon: Icons.restaurant, active: false),
-                _Chip(label: 'Traffic', icon: Icons.traffic, active: false),
+                const _Chip(label: 'Food', icon: Icons.restaurant, active: false),
+                const _Chip(label: 'Traffic', icon: Icons.traffic, active: false),
               ],
             ),
           ),
-
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: InkWell(
@@ -444,7 +502,6 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
           ),
-
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
             child: Row(
@@ -471,7 +528,6 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
           ),
-
           Expanded(
             child: filteredItems.isEmpty
                 ? const Center(
