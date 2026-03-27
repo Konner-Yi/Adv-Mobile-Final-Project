@@ -20,13 +20,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   final _captionController = TextEditingController();
   bool _isLoading = false;
 
-  // ── Theme ───────────────────────────────────────────────
-  static const Color _bg       = Color(0xFF0D0D0D);
-  static const Color _surface  = Color(0xFF1A1A1A);
-  static const Color _accent   = Color(0xFF1E88E5);
-  static const Color _yellow   = Color(0xFFFFD600);
+  static const Color _bg = Color(0xFF0D0D0D);
+  static const Color _surface = Color(0xFF1A1A1A);
+  static const Color _accent = Color(0xFF1E88E5);
+  static const Color _yellow = Color(0xFFFFD600);
 
-  // ── Image picker ────────────────────────────────────────
   Future<void> _pickImage() async {
     final picked = await ImagePicker().pickImage(
       source: ImageSource.gallery,
@@ -37,12 +35,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     }
   }
 
-  // ── Submit ──────────────────────────────────────────────
   Future<void> _submitPost() async {
-    if (_pickedImage == null) {
-      _snack('Please select a photo.');
-      return;
-    }
     if (_captionController.text.trim().isEmpty) {
       _snack('Please add a caption.');
       return;
@@ -51,45 +44,63 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final user = FirebaseAuth.instance.currentUser!;
+      final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
         _snack('You must be logged in to post.');
         setState(() => _isLoading = false);
         return;
       }
+
       final postId = FirebaseFirestore.instance.collection('posts').doc().id;
+      String imageUrl = '';
 
-      // 1 — Upload image
-      final ref = FirebaseStorage.instance.ref().child('posts/$postId.jpg');
-      await ref.putFile(_pickedImage!);
-      final imageUrl = await ref.getDownloadURL();
+      if (_pickedImage != null) {
+        final ref = FirebaseStorage.instance.ref().child('posts/$postId.jpg');
+        await ref.putFile(_pickedImage!);
+        imageUrl = await ref.getDownloadURL();
+      }
 
-      // 2 — Save Firestore doc
-      await FirebaseFirestore.instance.collection('posts').doc(postId).set({
-        'userId':    user.uid,
-        'username':  user.displayName ?? 'Anonymous',
-        'avatarUrl': user.photoURL ?? '',
-        'imageUrl':  imageUrl,
-        'caption':   _captionController.text.trim(),
-        'lat':       widget.pinnedLocation.latitude,
-        'lng':       widget.pinnedLocation.longitude,
-        'likes':     0,
-        'comments':  0,
-        'reposts':   0,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      final batch = FirebaseFirestore.instance.batch();
 
-      if (mounted) Navigator.pop(context, true); // ← returns true to MapPage
+      batch.set(
+        FirebaseFirestore.instance.collection('posts').doc(postId),
+        {
+          'userId': user.uid,
+          'username': user.displayName ?? 'Anonymous',
+          'avatarUrl': user.photoURL ?? '',
+          'imageUrl': imageUrl,
+          'caption': _captionController.text.trim(),
+          'lat': widget.pinnedLocation.latitude,
+          'lng': widget.pinnedLocation.longitude,
+          'likes': 0,
+          'comments': 0,
+          'reposts': 0,
+          'ratingTotal': 0,
+          'ratingCount': 0,
+          'createdAt': FieldValue.serverTimestamp(),
+        },
+      );
+
+      batch.set(
+        FirebaseFirestore.instance.collection('users').doc(user.uid),
+        {
+          'score': FieldValue.increment(5),
+        },
+        SetOptions(merge: true),
+      );
+
+      await batch.commit();
+
+      if (mounted) Navigator.pop(context, true);
     } catch (e) {
       _snack('Error: $e');
       setState(() => _isLoading = false);
     }
   }
 
-  void _snack(String msg) => ScaffoldMessenger.of(context)
-      .showSnackBar(SnackBar(content: Text(msg)));
+  void _snack(String msg) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
 
-  // ── UI ──────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -107,26 +118,26 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             padding: const EdgeInsets.only(right: 12),
             child: _isLoading
                 ? const Center(
-              child: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: _accent,
-                ),
-              ),
-            )
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: _accent,
+                      ),
+                    ),
+                  )
                 : TextButton(
-              onPressed: _submitPost,
-              child: const Text(
-                'Share',
-                style: TextStyle(
-                  color: _accent,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-            ),
+                    onPressed: _submitPost,
+                    child: const Text(
+                      'Share',
+                      style: TextStyle(
+                        color: _accent,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
           ),
         ],
       ),
@@ -135,7 +146,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Photo ──
             GestureDetector(
               onTap: _isLoading ? null : _pickImage,
               child: AnimatedContainer(
@@ -152,51 +162,48 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 ),
                 child: _pickedImage != null
                     ? ClipRRect(
-                  borderRadius: BorderRadius.circular(17),
-                  child: Image.file(
-                    _pickedImage!,
-                    fit: BoxFit.cover,
-                  ),
-                )
+                        borderRadius: BorderRadius.circular(17),
+                        child: Image.file(
+                          _pickedImage!,
+                          fit: BoxFit.cover,
+                        ),
+                      )
                     : Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: _accent.withOpacity(0.1),
-                        shape: BoxShape.circle,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: _accent.withOpacity(0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.add_photo_alternate_outlined,
+                              color: _accent,
+                              size: 40,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'Add a photo',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Tap to pick from gallery',
+                            style: TextStyle(
+                              color: Colors.white30,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
                       ),
-                      child: const Icon(
-                        Icons.add_photo_alternate_outlined,
-                        color: _accent,
-                        size: 40,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Add a photo',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Tap to pick from gallery',
-                      style: TextStyle(
-                        color: Colors.white30,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
               ),
             ),
-
             const SizedBox(height: 16),
-
-            // ── Caption ──
             TextField(
               controller: _captionController,
               maxLines: 4,
@@ -217,10 +224,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 ),
               ),
             ),
-
             const SizedBox(height: 16),
-
-            // ── Location badge ──
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
@@ -234,7 +238,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   const SizedBox(width: 8),
                   Text(
                     '${widget.pinnedLocation.latitude.toStringAsFixed(5)}, '
-                        '${widget.pinnedLocation.longitude.toStringAsFixed(5)}',
+                    '${widget.pinnedLocation.longitude.toStringAsFixed(5)}',
                     style: const TextStyle(
                       color: Colors.white70,
                       fontSize: 13,
