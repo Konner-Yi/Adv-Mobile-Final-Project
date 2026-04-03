@@ -9,7 +9,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class CreatePostScreen extends StatefulWidget {
   final LatLng pinnedLocation;
 
-  const CreatePostScreen({super.key, required this.pinnedLocation});
+  /// If set, the post is saved to `place_posts` and tagged with this placeId.
+  /// If null, saves to the regular `posts` collection (free map post).
+  final String? placeId;
+
+  const CreatePostScreen({
+    super.key,
+    required this.pinnedLocation,
+    this.placeId,
+  });
 
   @override
   State<CreatePostScreen> createState() => _CreatePostScreenState();
@@ -21,10 +29,12 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   bool _isLoading = false;
 
   // ── Theme ───────────────────────────────────────────────
-  static const Color _bg       = Color(0xFF0D0D0D);
-  static const Color _surface  = Color(0xFF1A1A1A);
-  static const Color _accent   = Color(0xFF1E88E5);
-  static const Color _yellow   = Color(0xFFFFD600);
+  static const Color _bg      = Color(0xFF0D0D0D);
+  static const Color _surface = Color(0xFF1A1A1A);
+  static const Color _accent  = Color(0xFF1E88E5);
+  static const Color _yellow  = Color(0xFFFFD600);
+
+  bool get _isPlacePost => widget.placeId != null;
 
   // ── Image picker ────────────────────────────────────────
   Future<void> _pickImage() async {
@@ -51,21 +61,24 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final user = FirebaseAuth.instance.currentUser!;
+      final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
         _snack('You must be logged in to post.');
         setState(() => _isLoading = false);
         return;
       }
-      final postId = FirebaseFirestore.instance.collection('posts').doc().id;
+
+      // Use correct collection based on whether this is a place post
+      final collection = _isPlacePost ? 'place_posts' : 'posts';
+      final postId     = FirebaseFirestore.instance.collection(collection).doc().id;
 
       // 1 — Upload image
-      final ref = FirebaseStorage.instance.ref().child('posts/$postId.jpg');
+      final ref = FirebaseStorage.instance.ref().child('$collection/$postId.jpg');
       await ref.putFile(_pickedImage!);
       final imageUrl = await ref.getDownloadURL();
 
-      // 2 — Save Firestore doc
-      await FirebaseFirestore.instance.collection('posts').doc(postId).set({
+      // 2 — Build the document
+      final docData = <String, dynamic>{
         'userId':    user.uid,
         'username':  user.displayName ?? 'Anonymous',
         'avatarUrl': user.photoURL ?? '',
@@ -77,9 +90,20 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         'comments':  0,
         'reposts':   0,
         'createdAt': FieldValue.serverTimestamp(),
-      });
+      };
 
-      if (mounted) Navigator.pop(context, true); // ← returns true to MapPage
+      // Attach placeId if this is a place post
+      if (_isPlacePost) {
+        docData['placeId'] = widget.placeId;
+      }
+
+      // 3 — Save to Firestore
+      await FirebaseFirestore.instance
+          .collection(collection)
+          .doc(postId)
+          .set(docData);
+
+      if (mounted) Navigator.pop(context, true);
     } catch (e) {
       _snack('Error: $e');
       setState(() => _isLoading = false);
@@ -98,9 +122,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         backgroundColor: _bg,
         foregroundColor: Colors.white,
         elevation: 0,
-        title: const Text(
-          'New Post',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Text(
+          _isPlacePost ? 'Post at this place' : 'New Post',
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
           Padding(
@@ -153,10 +177,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 child: _pickedImage != null
                     ? ClipRRect(
                   borderRadius: BorderRadius.circular(17),
-                  child: Image.file(
-                    _pickedImage!,
-                    fit: BoxFit.cover,
-                  ),
+                  child: Image.file(_pickedImage!, fit: BoxFit.cover),
                 )
                     : Column(
                   mainAxisAlignment: MainAxisAlignment.center,
