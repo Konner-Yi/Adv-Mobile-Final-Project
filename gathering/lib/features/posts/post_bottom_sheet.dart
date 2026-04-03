@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'moderation_service.dart';
 
 class PostBottomSheet extends StatefulWidget {
   final Map<String, dynamic> post;
@@ -22,13 +23,18 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
   static const Color _surface = Color(0xFF1A1A1A);
   static const Color _accent = Color(0xFF1E88E5);
   static const Color _yellow = Color(0xFFFFD600);
+  static const Color _red = Color(0xFFD32F2F);
 
   bool _liked = false;
+  bool _disliked = false;
   bool _reposted = false;
   int _myRating = 0;
+  bool _isPostOwnerBlocked = false;
+  bool _isPostRemoved = false;
 
   final String _uid = FirebaseAuth.instance.currentUser?.uid ?? '';
   final bool _isGuest = FirebaseAuth.instance.currentUser == null;
+  final ModerationService _moderationService = ModerationService();
 
   String get _postOwnerId => (widget.post['userId'] ?? '').toString();
 
@@ -39,6 +45,8 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
       _checkIfLiked();
       _checkIfReposted();
       _loadMyRating();
+      _checkIfDisliked();
+      _checkIfOwnerBlocked();
     }
   }
 
@@ -60,6 +68,24 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
         .doc(_uid)
         .get();
     if (mounted) setState(() => _reposted = doc.exists);
+  }
+
+  Future<void> _checkIfDisliked() async {
+    try {
+      final disliked = await _moderationService.hasUserDisliked(widget.postId);
+      if (mounted) setState(() => _disliked = disliked);
+    } catch (e) {
+      print('Error checking dislike: $e');
+    }
+  }
+
+  Future<void> _checkIfOwnerBlocked() async {
+    try {
+      final isBlocked = await _moderationService.isUserBlocked(_postOwnerId);
+      if (mounted) setState(() => _isPostOwnerBlocked = isBlocked);
+    } catch (e) {
+      print('Error checking block status: $e');
+    }
   }
 
   Future<void> _loadMyRating() async {
@@ -120,6 +146,192 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
 
       await batch.commit();
       if (mounted) setState(() => _liked = true);
+    }
+  }
+
+  Future<void> _toggleDislike() async {
+    if (_isGuest) {
+      _snackLoginRequired();
+      return;
+    }
+
+    if (_disliked) {
+      //options when adding dislike
+      _showDislikeReasonDialog();
+    } else {
+      // Remove dislike
+      try {
+        await _moderationService.toggleDislike(widget.postId, null);
+        if (mounted) setState(() => _disliked = false);
+        _snack('Dislike removed');
+      } catch (e) {
+        _snack('Error: $e');
+      }
+    }
+  }
+
+  void _showDislikeReasonDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: _surface,
+        title: const Text(
+          'Why are you disliking this?',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _DislikeReasonButton(
+              label: 'Inappropriate Content',
+              onTap: () {
+                Navigator.pop(context);
+                _addDislike('Inappropriate Content');
+              },
+            ),
+            _DislikeReasonButton(
+              label: 'Spam or Misleading',
+              onTap: () {
+                Navigator.pop(context);
+                _addDislike('Spam or Misleading');
+              },
+            ),
+            _DislikeReasonButton(
+              label: 'Low Quality',
+              onTap: () {
+                Navigator.pop(context);
+                _addDislike('Low Quality');
+              },
+            ),
+            _DislikeReasonButton(
+              label: 'Other',
+              onTap: () {
+                Navigator.pop(context);
+                _addDislike('Other');
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _addDislike(String reason) async {
+    try {
+      HapticFeedback.lightImpact();
+      await _moderationService.toggleDislike(widget.postId, reason);
+      if (mounted) {
+        setState(() => _disliked = true);
+        _snack('Dislike recorded. Thank you for helping improve the community!');
+      }
+    } catch (e) {
+      _snack('Error: $e');
+    }
+  }
+
+  Future<void> _showBlockUserOptions() async {
+    if (_isGuest) {
+      _snackLoginRequired();
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: _bg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              _isPostOwnerBlocked ? 'User Blocked' : 'Block User?',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (_isPostOwnerBlocked)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'You have blocked this user. You won\'t see their posts anymore.',
+                    style: TextStyle(color: Colors.white70, fontSize: 14),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _unblockUser,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _accent,
+                    ),
+                    child: const Text('Unblock User'),
+                  ),
+                ],
+              )
+            else
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Blocking this user will hide their posts from your feed.',
+                    style: TextStyle(color: Colors.white70, fontSize: 14),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _blockUser,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _red,
+                    ),
+                    child: const Text('Block User'),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.white24),
+                    ),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _blockUser() async {
+    try {
+      await _moderationService.blockUser(_postOwnerId);
+      if (mounted) {
+        setState(() => _isPostOwnerBlocked = true);
+        Navigator.pop(context);
+        _snack('User blocked successfully');
+      }
+    } catch (e) {
+      _snack('Error blocking user: $e');
+    }
+  }
+
+  Future<void> _unblockUser() async {
+    try {
+      await _moderationService.unblockUser(_postOwnerId);
+      if (mounted) {
+        setState(() => _isPostOwnerBlocked = false);
+        Navigator.pop(context);
+        _snack('User unblocked');
+      }
+    } catch (e) {
+      _snack('Error unblocking user: $e');
     }
   }
 
@@ -278,6 +490,12 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
     );
   }
 
+  void _snack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg)),
+    );
+  }
+
   String _getReputationLabel(int score) {
     if (score >= 150) return 'Community Leader';
     if (score >= 75) return 'Local Guide';
@@ -292,6 +510,48 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
     final username = post['username'] as String? ?? 'Anonymous';
     final imageUrl = post['imageUrl'] as String? ?? '';
     final caption = post['caption'] as String? ?? '';
+    final isRemoved = post['isRemoved'] as bool? ?? false;
+
+    // hide removed posts
+    if (isRemoved) {
+      return Container(
+        decoration: const BoxDecoration(
+          color: _bg,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const SizedBox(height: 40),
+            Icon(
+              Icons.block,
+              color: _red,
+              size: 48,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'This post has been removed',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              post['removalReason'] ?? 'Post removed by moderation',
+              style: const TextStyle(
+                color: Colors.white54,
+                fontSize: 14,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 40),
+          ],
+        ),
+      );
+    }
 
     return Container(
       decoration: const BoxDecoration(
@@ -367,6 +627,14 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
                     },
                   ),
                 ),
+                if (_uid != _postOwnerId)
+                  IconButton(
+                    icon: Icon(
+                      Icons.more_vert,
+                      color: _isPostOwnerBlocked ? _red : Colors.white54,
+                    ),
+                    onPressed: _showBlockUserOptions,
+                  ),
               ],
             ),
           ),
@@ -396,6 +664,7 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
               final likes = data?['likes'] ?? 0;
               final comments = data?['comments'] ?? 0;
               final reposts = data?['reposts'] ?? 0;
+              final dislikes = data?['dislikes'] ?? 0;
               final ratingTotal = (data?['ratingTotal'] ?? 0) as num;
               final ratingCount = (data?['ratingCount'] ?? 0) as num;
               final averageRating = ratingCount > 0
@@ -484,9 +753,47 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
                           count: reposts,
                           onTap: _toggleRepost,
                         ),
+                        const SizedBox(width: 4),
+                        _ActionButton(
+                          icon: _disliked ? Icons.thumb_down : Icons.thumb_down_outlined,
+                          color: _disliked ? _red : Colors.white70,
+                          count: dislikes,
+                          onTap: _toggleDislike,
+                        ),
                       ],
                     ),
                   ),
+                  if (dislikes >= 3)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: _red.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: _red.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.warning_outlined,
+                              color: _red,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'This post has received many dislikes ($dislikes)',
+                                style: TextStyle(
+                                  color: _red.withOpacity(0.8),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                 ],
               );
             },
@@ -564,6 +871,35 @@ class _ActionButton extends StatelessWidget {
     );
   }
 }
+
+class _DislikeReasonButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+
+  const _DislikeReasonButton({
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: onTap,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF262626),
+            foregroundColor: Colors.white,
+          ),
+          child: Text(label),
+        ),
+      ),
+    );
+  }
+}
+
 
 class _CommentsSheet extends StatefulWidget {
   final String postId;
