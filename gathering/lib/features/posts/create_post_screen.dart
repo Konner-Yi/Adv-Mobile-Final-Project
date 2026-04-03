@@ -62,6 +62,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
       final batch = FirebaseFirestore.instance.batch();
 
+      // ✅ MODERATION FIELDS ADDED HERE
       batch.set(
         FirebaseFirestore.instance.collection('posts').doc(postId),
         {
@@ -73,11 +74,15 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           'lat': widget.pinnedLocation.latitude,
           'lng': widget.pinnedLocation.longitude,
           'likes': 0,
+          'dislikes': 0,                    // ✅ NEW: Initialize dislike count
           'comments': 0,
           'reposts': 0,
           'ratingTotal': 0,
           'ratingCount': 0,
           'createdAt': FieldValue.serverTimestamp(),
+          'isRemoved': false,               // ✅ NEW: Post removal status
+          'removalReason': null,            // ✅ NEW: Removal reason
+          'removedAt': null,                // ✅ NEW: When removed
         },
       );
 
@@ -259,3 +264,4 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     super.dispose();
   }
 }
+
