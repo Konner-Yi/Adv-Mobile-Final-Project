@@ -13,6 +13,7 @@ import 'package:local_link_web/features/posts/create_post_screen.dart';
 import 'package:local_link_web/features/posts/post_bottom_sheet.dart';
 import 'package:local_link_web/features/places/place_bottom_sheet.dart';
 import 'package:local_link_web/features/places/places_service.dart';
+import 'package:local_link_web/features/posts/create_post_screen.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({Key? key}) : super(key: key);
@@ -72,6 +73,65 @@ class _MapScreenState extends State<MapPage>
     );
   }
 
+  Widget _buildPostMarkerIcon(Map<String, dynamic> data) {
+    final imageUrl = data['imageUrl'] as String? ?? '';
+    final postIcon = data['postIcon'] as String?;
+
+    if (imageUrl.isNotEmpty) {
+      // Real photo post
+      return Container(
+        decoration: BoxDecoration(
+          color: blue,
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.3),
+              blurRadius: 6,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: ClipOval(
+          child: Image.network(imageUrl, fit: BoxFit.cover),
+        ),
+      );
+    }
+
+    if (postIcon != null) {
+      // Stock icon post — find the matching option
+      final opt = kStockOptions.firstWhere(
+            (o) => o.label == postIcon,
+        orElse: () => const StockOption(Icons.place, blue, 'default'),
+      );
+      return Container(
+        decoration: BoxDecoration(
+          color: opt.color,
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: opt.color.withOpacity(0.45),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Icon(opt.icon, color: Colors.white, size: 22),
+      );
+    }
+
+    // Fallback
+    return Container(
+      decoration: BoxDecoration(
+        color: blue,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 2),
+      ),
+      child: const Icon(Icons.place, color: Colors.white, size: 22),
+    );
+  }
+
   // ── Load user posts ───────────────────────────────────────────────────────
   Future<void> _loadPosts() async {
     final snapshot = await FirebaseFirestore.instance
@@ -94,25 +154,8 @@ class _MapScreenState extends State<MapPage>
           height: 44,
           child: GestureDetector(
             onTap: () => _openPost({...data, 'postId': doc.id}),
-            child: Container(
-              decoration: BoxDecoration(
-                color: blue,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
-                    blurRadius: 6,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: ClipOval(
-                child: (data['imageUrl'] as String?)?.isNotEmpty == true
-                    ? Image.network(data['imageUrl'], fit: BoxFit.cover)
-                    : const Icon(Icons.photo, color: Colors.white, size: 22),
-              ),
-            ),
+            child: _buildPostMarkerIcon(data),
+
           ),
         ),
       );
