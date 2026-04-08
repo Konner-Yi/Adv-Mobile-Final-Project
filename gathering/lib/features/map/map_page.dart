@@ -447,7 +447,37 @@ class _MapScreenState extends State<MapPage>
                 ),
               ),
             ),
-
+          Positioned(
+            right: 16,
+            bottom: navBarClearance + 128, // sits above recenter
+            child: GestureDetector(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                final currentZoom = _mapController.camera.zoom;
+                _mapController.move(
+                  _mapController.camera.center,
+                  (currentZoom - 1.5).clamp(2.0, 18.0),
+                );
+              },
+              child: Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: white,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: blue, width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.15),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.zoom_out, color: blue, size: 26),
+              ),
+            ),
+          ),
           // ── Recenter button ────────────────────────────────────────────
           Positioned(
             right: 16,
