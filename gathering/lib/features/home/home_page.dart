@@ -239,16 +239,6 @@ class _HomePageState extends State<HomePage> {
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined, color: grey600),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: const Icon(Icons.account_circle_outlined, color: grey600),
-            onPressed: () {},
-          ),
-        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(height: 1, color: grey200),

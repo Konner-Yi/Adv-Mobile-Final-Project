@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'moderation_service.dart';
+import '../posts/create_post_screen.dart';
 
 class PostBottomSheet extends StatefulWidget {
   final Map<String, dynamic> post;
@@ -17,6 +18,8 @@ class PostBottomSheet extends StatefulWidget {
   @override
   State<PostBottomSheet> createState() => _PostBottomSheetState();
 }
+
+
 
 class _PostBottomSheetState extends State<PostBottomSheet> {
   static const Color _bg = Color(0xFF0D0D0D);
@@ -638,6 +641,22 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
               ],
             ),
           ),
+          // if (imageUrl.isNotEmpty)
+          //   Image.network(
+          //     imageUrl,
+          //     width: double.infinity,
+          //     height: 320,
+          //     fit: BoxFit.cover,
+          //     loadingBuilder: (_, child, progress) => progress == null
+          //         ? child
+          //         : Container(
+          //             height: 320,
+          //             color: _surface,
+          //             child: const Center(
+          //               child: CircularProgressIndicator(color: _accent),
+          //             ),
+          //           ),
+          //   ),
           if (imageUrl.isNotEmpty)
             Image.network(
               imageUrl,
@@ -647,13 +666,16 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
               loadingBuilder: (_, child, progress) => progress == null
                   ? child
                   : Container(
-                      height: 320,
-                      color: _surface,
-                      child: const Center(
-                        child: CircularProgressIndicator(color: _accent),
-                      ),
-                    ),
-            ),
+                height: 320,
+                color: _surface,
+                child: const Center(
+                  child: CircularProgressIndicator(color: _accent),
+                ),
+              ),
+            )
+          else if ((post['postIcon'] as String?) != null)
+            _PostIconDisplay(iconLabel: post['postIcon'] as String),
+
           StreamBuilder<DocumentSnapshot>(
             stream: FirebaseFirestore.instance
                 .collection('posts')
@@ -1297,3 +1319,36 @@ class _CommentTile extends StatelessWidget {
     );
   }
 }
+
+
+// ── Stock icon display in post sheet ─────────────────────────────────────────
+class _PostIconDisplay extends StatelessWidget {
+  final String iconLabel;
+  const _PostIconDisplay({required this.iconLabel});
+
+  @override
+  Widget build(BuildContext context) {
+    // Find the matching stock option; fall back to camera icon
+    final opt = kStockOptions.firstWhere(
+          (o) => o.label == iconLabel,
+      orElse: () => const StockOption(
+          Icons.photo_camera, Color(0xFF546E7A), 'photo'),
+    );
+    return Container(
+      width: double.infinity,
+      height: 280,
+      decoration: BoxDecoration(
+        gradient: RadialGradient(
+          colors: [
+            opt.color.withOpacity(0.30),
+            opt.color.withOpacity(0.07),
+          ],
+        ),
+      ),
+      child: Center(
+        child: Icon(opt.icon, color: opt.color, size: 96),
+      ),
+    );
+  }
+}
+
