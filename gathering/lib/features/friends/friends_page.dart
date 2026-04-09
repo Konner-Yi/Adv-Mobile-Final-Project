@@ -3,6 +3,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../core/services/auth_service.dart';
 import '../profile/profile_page.dart';
+import '../../core/services/chat_service.dart';
+import '../messages/chat_detail_page.dart';
+import '../messages/models/chat_models.dart';
 
 enum _FriendsFilter { all, az, za, recent, nearby }
 
@@ -534,6 +537,21 @@ class _FriendsPageState extends State<FriendsPage> {
     final photoUrl = (user['photoUrl'] ?? '').toString();
     final distanceText = _formatDistance(user['distanceKm']);
 
+    // Build a ChatUser from the friend map
+    ChatUser buildChatUser() {
+      return ChatUser.fromMap({
+        'uid': uid,
+        'username': username,
+        'realName': realName,
+        'photoUrl': photoUrl,
+        'email': (user['email'] ?? '').toString(),
+        'bio': (user['bio'] ?? '').toString(),
+        'pronouns': (user['pronouns'] ?? '').toString(),
+        'country': (user['country'] ?? '').toString(),
+        'tags': user['tags'] ?? const <String>[],
+      });
+    }
+
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -577,10 +595,7 @@ class _FriendsPageState extends State<FriendsPage> {
                     const SizedBox(height: 2),
                     Text(
                       realName,
-                      style: const TextStyle(
-                        color: grey600,
-                        fontSize: 13,
-                      ),
+                      style: const TextStyle(color: grey600, fontSize: 13),
                     ),
                   ],
                   if (distanceText.isNotEmpty) ...[
@@ -602,10 +617,33 @@ class _FriendsPageState extends State<FriendsPage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   ElevatedButton(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Messaging $username coming soon'),
+                    onPressed: () async {
+                      final currentUser =
+                      await ChatService.instance.getCurrentChatUser();
+                      if (!context.mounted) return;
+
+                      if (currentUser == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Could not load your profile')),
+                        );
+                        return;
+                      }
+
+                      final otherUser = buildChatUser();
+                      final conversation =
+                      await ChatService.instance.createOrGetConversation(
+                        currentUser: currentUser,
+                        otherUser: otherUser,
+                      );
+                      if (!context.mounted) return;
+
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ChatDetailPage(
+                            otherUser: otherUser,
+                            conversationId: conversation.id,
+                          ),
                         ),
                       );
                     },
@@ -631,19 +669,14 @@ class _FriendsPageState extends State<FriendsPage> {
                           currentUid: currentUid,
                           friendUid: uid,
                         );
-
                         if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Removed $username'),
-                          ),
+                          SnackBar(content: Text('Removed $username')),
                         );
                       } catch (e) {
                         if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(e.toString()),
-                          ),
+                          SnackBar(content: Text(e.toString())),
                         );
                       }
                     },
