@@ -175,9 +175,6 @@ class _MapScreenState extends State<MapPage>
     final center = _mapCenter ?? _currentLocation;
     if (center == null) return;
 
-    // Skip if not forced and already have markers
-    if (!forceReload && _placeMarkers.isNotEmpty) return;
-
     try {
       debugPrint('Fetching places at center: $center');
 
@@ -387,6 +384,10 @@ class _MapScreenState extends State<MapPage>
   void _onMapEvent(MapEvent event) {
     if (event is MapEventMoveEnd || event is MapEventScrollWheelZoom) {
       _mapCenter = event.camera.center; // only update map center, not GPS
+
+      // Don't load until we have a real GPS fix
+      if (_currentLocation == null) return;
+
       _placeDebounce?.cancel();
       _placeDebounce = Timer(const Duration(milliseconds: 700), _loadPlaces);
     }

@@ -10,10 +10,10 @@ const _overpassUrl = 'https://overpass-api.de/api/interpreter';
 // within [radiusMetres] of [center]. Nodes without a name are filtered out.
 Future<List<Map<String, dynamic>>> fetchNearbyPlaces(
     LatLng center, {
-      int radiusMetres = 1000,
+      int radiusMetres = 1500,
     }) async {
   final query = '''
-[out:json][timeout:10];
+[out:json][timeout:25];
 (
   node["amenity"](around:$radiusMetres,${center.latitude},${center.longitude});
   node["shop"](around:$radiusMetres,${center.latitude},${center.longitude});
@@ -145,12 +145,15 @@ Future<List<Map<String, dynamic>>> searchPlacesByName(
   if (query.trim().isEmpty) return [];
 
   // Overpass regex search on the name tag — case insensitive
-  final escaped = query.trim().replaceAll('"', '\\"');
+  final normalized = query
+      .trim()
+      .replaceAll('"', '\\"')
+      .replaceAll(RegExp(r'\s+'), '.*');
   final overpassQuery = '''
-[out:json][timeout:10];
+[out:json][timeout:25];
 (
-  node["name"~"$escaped",i](around:$radiusMetres,${center.latitude},${center.longitude});
-  way["name"~"$escaped",i](around:$radiusMetres,${center.latitude},${center.longitude});
+  node["name"~"^$normalized",i](around:$radiusMetres,${center.latitude},${center.longitude});
+  way["name"~"^$normalized",i](around:$radiusMetres,${center.latitude},${center.longitude});
 );
 out center body;
 ''';

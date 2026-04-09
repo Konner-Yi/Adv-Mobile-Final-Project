@@ -192,27 +192,26 @@ class _HomePageState extends State<HomePage> {
 
   // ── Name search ───────────────────────────────────────────────────────────
   void _onSearchChanged(String val) {
+    _searchDebounce?.cancel();
     setState(() => _searchQuery = val);
+
     if (val.trim().isEmpty) {
-      _searchDebounce?.cancel();
-      setState(() => _searching = false);
       _applyChipFilter();
       return;
     }
-    _searchDebounce?.cancel();
-    _searchDebounce = Timer(const Duration(milliseconds: 600), () async {
-      if (_userLocation == null) return;
-      setState(() => _searching = true);
-      final results = await searchPlacesByName(val.trim(), _userLocation!);
-      _sortByDistance(results);
-      if (mounted) {
-        setState(() {
-          _filteredPlaces = results;
-          _searching      = false;
-        });
-      }
-    });
+
+    // Search entirely in-memory against the already-loaded _allPlaces cache
+    final q = val.trim().toLowerCase();
+    final results = _allPlaces.where((node) {
+      final tags = node['tags'] as Map<String, dynamic>? ?? {};
+      final name = (tags['name'] as String? ?? '').toLowerCase();
+      return name.startsWith(q) || name.contains(' $q');
+    }).toList();
+
+    _sortByDistance(results);
+    setState(() => _filteredPlaces = results);
   }
+
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   void _sortByDistance(List<Map<String, dynamic>> list) {
