@@ -13,6 +13,7 @@ import 'package:local_link_web/features/posts/create_post_screen.dart';
 import 'package:local_link_web/features/posts/post_bottom_sheet.dart';
 import 'package:local_link_web/features/places/place_bottom_sheet.dart';
 import 'package:local_link_web/features/places/places_service.dart';
+import 'package:local_link_web/features/posts/create_post_screen.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({Key? key}) : super(key: key);
@@ -83,6 +84,65 @@ class _MapScreenState extends State<MapPage>
     );
   }
 
+  Widget _buildPostMarkerIcon(Map<String, dynamic> data) {
+    final imageUrl = data['imageUrl'] as String? ?? '';
+    final postIcon = data['postIcon'] as String?;
+
+    if (imageUrl.isNotEmpty) {
+      // Real photo post
+      return Container(
+        decoration: BoxDecoration(
+          color: blue,
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.3),
+              blurRadius: 6,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: ClipOval(
+          child: Image.network(imageUrl, fit: BoxFit.cover),
+        ),
+      );
+    }
+
+    if (postIcon != null) {
+      // Stock icon post — find the matching option
+      final opt = kStockOptions.firstWhere(
+            (o) => o.label == postIcon,
+        orElse: () => const StockOption(Icons.place, blue, 'default'),
+      );
+      return Container(
+        decoration: BoxDecoration(
+          color: opt.color,
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: opt.color.withOpacity(0.45),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Icon(opt.icon, color: Colors.white, size: 22),
+      );
+    }
+
+    // Fallback
+    return Container(
+      decoration: BoxDecoration(
+        color: blue,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 2),
+      ),
+      child: const Icon(Icons.place, color: Colors.white, size: 22),
+    );
+  }
+
   // ── Load user posts ───────────────────────────────────────────────────────
   Future<void> _loadPosts() async {
     final snapshot = await FirebaseFirestore.instance
@@ -136,26 +196,9 @@ class _MapScreenState extends State<MapPage>
           width: 44,
           height: 44,
           child: GestureDetector(
-            onTap: () => _openPost(post),
-            child: Container(
-              decoration: BoxDecoration(
-                color: blue,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
-                    blurRadius: 6,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: ClipOval(
-                child: imageUrl.isNotEmpty
-                    ? Image.network(imageUrl, fit: BoxFit.cover)
-                    : const Icon(Icons.photo, color: Colors.white, size: 22),
-              ),
-            ),
+            onTap: () => _openPost({...data, 'postId': doc.id}),
+            child: _buildPostMarkerIcon(data),
+
           ),
         ),
       );
@@ -533,150 +576,38 @@ class _MapScreenState extends State<MapPage>
                 ),
               ),
             ),
-
-          // ── Filter panel ──────────────────────────────────────────────
-          if (_showFilterPanel)
-            Positioned(
-              top: MediaQuery.of(context).padding.top + 16,
-              right: 16,
+          Positioned(
+            right: 16,
+            bottom: navBarClearance + 128, // sits above recenter
+            child: GestureDetector(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                final currentZoom = _mapController.camera.zoom;
+                _mapController.move(
+                  _mapController.camera.center,
+                  (currentZoom - 1.5).clamp(2.0, 18.0),
+                );
+              },
               child: Container(
-                width: 230,
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                width: 52,
+                height: 52,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A1A),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white12),
+                  color: white,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: blue, width: 2),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.3),
-                      blurRadius: 12,
+                      color: Colors.black.withOpacity(0.15),
+                      blurRadius: 8,
                       offset: const Offset(0, 4),
                     ),
                   ],
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(14, 4, 14, 8),
-                      child: Row(
-                        children: [
-                          const Text(
-                            'Map Filters',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                          ),
-                          const Spacer(),
-                          GestureDetector(
-                            onTap: () => setState(
-                                    () => _showFilterPanel = false),
-                            child: const Icon(Icons.close,
-                                color: Colors.white38, size: 18),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Divider(color: Colors.white10, height: 1),
-                    _FilterTile(
-                      label:    'Show places',
-                      subtitle: 'Restaurants, shops, etc.',
-                      icon:     Icons.storefront,
-                      value:    _showPlaces,
-                      onChanged: (v) {
-                        setState(() => _showPlaces = v);
-                        _rebuildPlaceMarkers();
-                      },
-                    ),
-                    _FilterTile(
-                      label:    'Show empty places',
-                      subtitle: 'Places with no posts yet',
-                      icon:     Icons.location_off_outlined,
-                      value:    _showEmptyPlaces,
-                      enabled:  _showPlaces,
-                      onChanged: (v) {
-                        setState(() => _showEmptyPlaces = v);
-                        _rebuildPlaceMarkers();
-                      },
-                    ),
-                    _FilterTile(
-                      label:    'Show user posts',
-                      subtitle: 'Posts on the map',
-                      icon:     Icons.photo_library_outlined,
-                      value:    _showUserPosts,
-                      onChanged: (v) {
-                        setState(() => _showUserPosts = v);
-                        _rebuildPostMarkers();
-                      },
-                    ),
-                  ],
-                ),
+                child: const Icon(Icons.zoom_out, color: blue, size: 26),
               ),
             ),
-
-          // ── Filter button (top-right corner) ──────────────────────────
-          // Only visible when filter panel is closed
-          if (!_showFilterPanel)
-            Positioned(
-              top: MediaQuery.of(context).padding.top + 16,
-              right: 16,
-              child: GestureDetector(
-                onTap: () =>
-                    setState(() => _showFilterPanel = true),
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: white,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: blue, width: 2),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.15),
-                            blurRadius: 8,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.layers_outlined,
-                        color: blue,
-                        size: 22,
-                      ),
-                    ),
-                    // Yellow badge if any filter is off
-                    if (activeFiltersOff > 0)
-                      Positioned(
-                        top: -4, right: -4,
-                        child: Container(
-                          width: 18, height: 18,
-                          decoration: const BoxDecoration(
-                            color: yellow,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Center(
-                            child: Text(
-                              '$activeFiltersOff',
-                              style: const TextStyle(
-                                color: grey900,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-
-          // ── Recenter button (unchanged position) ──────────────────────
+          ),
+          // ── Recenter button ────────────────────────────────────────────
           Positioned(
             right: 16,
             bottom: navBarClearance + 64,

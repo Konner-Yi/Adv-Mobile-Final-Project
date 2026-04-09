@@ -3,8 +3,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
-/// Central auth + profile service.
-/// Location: lib/core/services/auth_service.dart
 class AuthService {
   AuthService._();
   static final AuthService instance = AuthService._();
@@ -13,13 +11,9 @@ class AuthService {
   final FirebaseFirestore _db      = FirebaseFirestore.instance;
   final FirebaseStorage   _storage = FirebaseStorage.instance;
 
-  // ── Auth state ────────────────────────────────────────────────────────────
-
   Stream<User?> get authStateChanges => _auth.authStateChanges();
   User? get currentUser => _auth.currentUser;
   bool  get isLoggedIn  => _auth.currentUser != null;
-
-  // ── Register ──────────────────────────────────────────────────────────────
 
   Future<String?> register({
     required String username,
@@ -33,6 +27,7 @@ class AuthService {
       );
       final uid = credential.user!.uid;
       await credential.user!.updateDisplayName(username.trim());
+
       await _db.collection('users').doc(uid).set({
         'uid':        uid,
         'username':   username.trim(),
@@ -47,7 +42,12 @@ class AuthService {
         'country':    '',
         'tags':       <String>[],
         'photoUrl':   '',
+
+        // 🔥 ONLY ADDITION (nothing else changed)
+        'latitude':   null,
+        'longitude':  null,
       });
+
       return null;
     } on FirebaseAuthException catch (e) {
       return _friendlyError(e.code);
@@ -55,8 +55,6 @@ class AuthService {
       return 'Something went wrong. Please try again.';
     }
   }
-
-  // ── Login ─────────────────────────────────────────────────────────────────
 
   Future<String?> login({
     required String email,
@@ -75,11 +73,7 @@ class AuthService {
     }
   }
 
-  // ── Logout ────────────────────────────────────────────────────────────────
-
   Future<void> logout() => _auth.signOut();
-
-  // ── Password reset ────────────────────────────────────────────────────────
 
   Future<String?> sendPasswordReset(String email) async {
     try {
@@ -90,9 +84,6 @@ class AuthService {
     }
   }
 
-  // ── Firestore profile ─────────────────────────────────────────────────────
-
-  /// Returns the full Firestore profile document for the current user.
   Future<Map<String, dynamic>?> getUserProfile() async {
     final uid = currentUser?.uid;
     if (uid == null) return null;
@@ -100,7 +91,6 @@ class AuthService {
     return doc.exists ? doc.data() : null;
   }
 
-  /// Returns a live stream of the current user's Firestore profile.
   Stream<Map<String, dynamic>?> getUserProfileStream() {
     final uid = currentUser?.uid;
     print('[AuthService] getUserProfileStream uid: $uid'); // <-- debug
@@ -115,40 +105,39 @@ class AuthService {
     });
   }
 
-  /// Updates arbitrary fields in the current user's Firestore document.
   Future<void> updateUserProfile(Map<String, dynamic> fields) async {
     final uid = currentUser?.uid;
     if (uid == null) return;
+
     await _db.collection('users').doc(uid).update(fields);
-    // Keep Firebase Auth display name in sync with username changes.
+
     if (fields.containsKey('username')) {
       await currentUser!.updateDisplayName(fields['username'] as String);
     }
   }
 
-  // ── Profile photo upload ──────────────────────────────────────────────────
-
-  /// Uploads [imageFile] to Firebase Storage and saves the download URL
-  /// in Firestore. Returns the URL on success, or null on failure.
   Future<String?> uploadProfilePhoto(File imageFile) async {
     final uid = currentUser?.uid;
     if (uid == null) return null;
+
     try {
       final ref = _storage.ref('profile_photos/$uid.jpg');
+
       await ref.putFile(
         imageFile,
         SettableMetadata(contentType: 'image/jpeg'),
       );
+
       final url = await ref.getDownloadURL();
+
       await _db.collection('users').doc(uid).update({'photoUrl': url});
       await currentUser!.updatePhotoURL(url);
+
       return url;
     } catch (_) {
       return null;
     }
   }
-
-  // ── Error messages ────────────────────────────────────────────────────────
 
   String _friendlyError(String code) {
     switch (code) {
