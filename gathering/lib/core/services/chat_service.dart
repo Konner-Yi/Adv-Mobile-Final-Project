@@ -29,6 +29,15 @@ class ChatService {
   }
 
   Stream<List<ChatConversation>> streamRecentConversations(String currentUid) {
+    // Log the UID and the query
+    print('[Firestore Debug] streamRecentConversations called with currentUid: $currentUid');
+
+    final query = _db
+        .collection('conversations')
+        .where('memberIds', arrayContains: currentUid);
+
+    print('[Firestore Debug] Firestore query: $query');
+
     return _db
         .collection('conversations')
         .where('memberIds', arrayContains: currentUid)

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -10,12 +12,8 @@ import 'package:local_link_web/features/posts/post_bottom_sheet.dart';
 import 'package:local_link_web/features/places/directions_screen.dart';
 
 class PlaceBottomSheet extends StatefulWidget {
-  /// The raw OSM node (has lat/lon/tags).
   final Map<String, dynamic> osmNode;
-
-  /// Pre-built details map from buildPlaceDetails().
   final Map<String, dynamic> placeDetails;
-
   final LatLng? userLocation;
 
   const PlaceBottomSheet({
@@ -30,20 +28,18 @@ class PlaceBottomSheet extends StatefulWidget {
 }
 
 class _PlaceBottomSheetState extends State<PlaceBottomSheet> {
-  // ── Theme ────────────────────────────────────────────────────────────────
   static const Color _bg      = Color(0xFF0D0D0D);
   static const Color _surface = Color(0xFF1A1A1A);
   static const Color _accent  = Color(0xFF1E88E5);
   static const Color _yellow  = Color(0xFFFFD600);
 
-  static const double _postRadius = 150; // metres
+  static const double _postRadius = 150;
 
-  // ── State ────────────────────────────────────────────────────────────────
-  List<Map<String, dynamic>> _posts       = [];
+  List<Map<String, dynamic>> _posts        = [];
   bool                       _loadingPosts = true;
   bool                       _canPost      = false;
+  bool                       _isPinned     = false;
 
-  // Stable OSM ID used as the placeId in Firestore
   String get _placeId => 'osm_${widget.osmNode['id']}';
 
   @override
@@ -57,6 +53,7 @@ class _PlaceBottomSheetState extends State<PlaceBottomSheet> {
       _fetchPlacePosts(),
       _checkProximity(),
     ]);
+    _checkIfPinned();
 
     if (mounted) {
       setState(() {
@@ -67,27 +64,28 @@ class _PlaceBottomSheetState extends State<PlaceBottomSheet> {
     }
   }
 
-  // ── Fetch posts for this OSM place ───────────────────────────────────────
   Future<List<Map<String, dynamic>>> _fetchPlacePosts() async {
+    print('PLACE ID QUERYING: $_placeId');
+    print('OSM NODE ID: ${widget.osmNode['id']}');
     final snap = await FirebaseFirestore.instance
         .collection('place_posts')
         .where('placeId', isEqualTo: _placeId)
         .orderBy('createdAt', descending: true)
         .get();
+    print('POSTS FOUND: ${snap.docs.length}');
     return snap.docs
         .map((d) => <String, dynamic>{...d.data(), 'postId': d.id})
         .toList();
   }
 
-  // ── Proximity check ──────────────────────────────────────────────────────
   Future<bool> _checkProximity() async {
     try {
-      final pos  = await Geolocator.getCurrentPosition(
+      final pos      = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
       final placeLat = widget.placeDetails['lat'] as double;
       final placeLng = widget.placeDetails['lng'] as double;
-      final dist = Geolocator.distanceBetween(
+      final dist     = Geolocator.distanceBetween(
         pos.latitude, pos.longitude,
         placeLat, placeLng,
       );
@@ -97,7 +95,53 @@ class _PlaceBottomSheetState extends State<PlaceBottomSheet> {
     }
   }
 
-  // ── Open CreatePostScreen ────────────────────────────────────────────────
+  Future<void> _checkIfPinned() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    final lat   = widget.placeDetails['lat'] as double;
+    final lng   = widget.placeDetails['lng'] as double;
+    final pinId = '${lat.toStringAsFixed(5)}_${lng.toStringAsFixed(5)}';
+    final doc   = await FirebaseFirestore.instance
+        .collection('users').doc(uid)
+        .collection('pins').doc(pinId).get();
+    if (mounted) setState(() => _isPinned = doc.exists);
+  }
+
+  Future<void> _togglePin() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    HapticFeedback.selectionClick();
+
+    final tags     = widget.osmNode['tags'] as Map<String, dynamic>? ?? {};
+    final name     = tags['name'] as String? ?? 'Unnamed area';
+    final lat      = widget.placeDetails['lat'] as double;
+    final lng      = widget.placeDetails['lng'] as double;
+    final category = categoryForNode(widget.osmNode);
+    final pinId    = '${lat.toStringAsFixed(5)}_${lng.toStringAsFixed(5)}';
+    final pinRef   = FirebaseFirestore.instance
+        .collection('users').doc(uid)
+        .collection('pins').doc(pinId);
+
+    if (_isPinned) {
+      await pinRef.delete();
+      if (mounted) setState(() => _isPinned = false);
+      if (mounted) ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Area unpinned')));
+    } else {
+      await pinRef.set({
+        'name':     name,
+        'category': category,
+        'lat':      lat,
+        'lng':      lng,
+        'osmId':    widget.osmNode['id'],
+        'pinnedAt': FieldValue.serverTimestamp(),
+      });
+      if (mounted) setState(() => _isPinned = true);
+      if (mounted) ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Area pinned!')));
+    }
+  }
+
   Future<void> _openCreatePost() async {
     final allowed = await _checkProximity();
     if (!allowed) {
@@ -129,7 +173,6 @@ class _PlaceBottomSheetState extends State<PlaceBottomSheet> {
     }
   }
 
-  // ── Open a post detail sheet ─────────────────────────────────────────────
   void _openPostDetail(Map<String, dynamic> post) {
     showModalBottomSheet(
       context: context,
@@ -138,11 +181,11 @@ class _PlaceBottomSheetState extends State<PlaceBottomSheet> {
       builder: (_) => PostBottomSheet(
         post: post,
         postId: post['postId'] as String,
+        collection: 'place_posts',
       ),
     );
   }
 
-  // ── URL helpers ──────────────────────────────────────────────────────────
   Future<void> _launchUrl(String url) async {
     final uri = Uri.parse(
       url.startsWith('http') ? url : 'https://$url',
@@ -168,7 +211,6 @@ class _PlaceBottomSheetState extends State<PlaceBottomSheet> {
     );
   }
 
-  // ── Build ────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
@@ -188,19 +230,18 @@ class _PlaceBottomSheetState extends State<PlaceBottomSheet> {
 
   Widget _buildContent(ScrollController scroll) {
     final details  = widget.placeDetails;
-    final name     = details['name']     as String? ?? '';
-    final type     = details['type']     as String? ?? '';
+    final name     = details['name']             as String? ?? '';
+    final type     = details['type']             as String? ?? '';
     final address  = details['formatted_address'] as String? ?? '';
     final phone    = details['formatted_phone_number'] as String?;
-    final website  = details['website']  as String?;
-    final hoursMap = details['opening_hours'] as Map<String, dynamic>? ?? {};
-    final isOpen   = hoursMap['open_now'] as bool?;
+    final website  = details['website']          as String?;
+    final hoursMap = details['opening_hours']    as Map<String, dynamic>? ?? {};
+    final isOpen   = hoursMap['open_now']        as bool?;
     final weekday  = List<String>.from(hoursMap['weekday_text'] as List? ?? []);
-    final lat      = details['lat'] as double;
-    final lng      = details['lng'] as double;
-    final tags     = details['tags'] as Map<String, dynamic>? ?? {};
+    final lat      = details['lat']              as double;
+    final lng      = details['lng']              as double;
+    final tags     = details['tags']             as Map<String, dynamic>? ?? {};
 
-    // Extra OSM tags that are nice to surface
     final cuisine     = tags['cuisine']     as String?;
     final wheelchair  = tags['wheelchair']  as String?;
     final description = tags['description'] as String?;
@@ -209,7 +250,6 @@ class _PlaceBottomSheetState extends State<PlaceBottomSheet> {
       controller: scroll,
       slivers: [
 
-        // ── Drag handle ─────────────────────────────────────────────────
         SliverToBoxAdapter(
           child: Center(
             child: Container(
@@ -223,7 +263,6 @@ class _PlaceBottomSheetState extends State<PlaceBottomSheet> {
           ),
         ),
 
-        // ── OSM notice (no photos) ───────────────────────────────────────
         SliverToBoxAdapter(
           child: Container(
             height: 100,
@@ -251,7 +290,6 @@ class _PlaceBottomSheetState extends State<PlaceBottomSheet> {
           ),
         ),
 
-        // ── Name + category + open/closed ────────────────────────────────
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -267,16 +305,11 @@ class _PlaceBottomSheetState extends State<PlaceBottomSheet> {
                   ),
                 ),
                 const SizedBox(height: 6),
-
-                // Category + cuisine chip row
                 Wrap(
                   spacing: 8,
                   children: [
                     if (type.isNotEmpty)
-                      _Chip(
-                        label: _capitalise(type),
-                        color: _colorForType(type),
-                      ),
+                      _Chip(label: _capitalise(type), color: _colorForType(type)),
                     if (cuisine != null)
                       _Chip(
                         label: _capitalise(cuisine.replaceAll(';', ' · ')),
@@ -288,14 +321,9 @@ class _PlaceBottomSheetState extends State<PlaceBottomSheet> {
                         color: isOpen ? Colors.green : Colors.red,
                       ),
                     if (wheelchair == 'yes')
-                      _Chip(
-                        label: 'Wheelchair accessible',
-                        color: Colors.blueGrey,
-                      ),
+                      _Chip(label: 'Wheelchair accessible', color: Colors.blueGrey),
                   ],
                 ),
-
-                // Address
                 if (address.isNotEmpty) ...[
                   const SizedBox(height: 10),
                   Row(
@@ -314,14 +342,11 @@ class _PlaceBottomSheetState extends State<PlaceBottomSheet> {
                     ],
                   ),
                 ],
-
-                // Description
                 if (description != null) ...[
                   const SizedBox(height: 8),
                   Text(
                     description,
-                    style: const TextStyle(
-                        color: Colors.white54, fontSize: 13),
+                    style: const TextStyle(color: Colors.white54, fontSize: 13),
                   ),
                 ],
               ],
@@ -329,7 +354,6 @@ class _PlaceBottomSheetState extends State<PlaceBottomSheet> {
           ),
         ),
 
-        // ── Action buttons ───────────────────────────────────────────────
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -354,18 +378,23 @@ class _PlaceBottomSheetState extends State<PlaceBottomSheet> {
                     label: 'Website',
                     onTap: () => _launchUrl(website),
                   ),
+                _ActionBtn(
+                  icon: _isPinned
+                      ? Icons.location_on
+                      : Icons.add_location_alt_outlined,
+                  label: _isPinned ? 'Pinned' : 'Pin area',
+                  onTap: _togglePin,
+                ),
               ],
             ),
           ),
         ),
 
-        // ── Opening hours ────────────────────────────────────────────────
         if (weekday.isNotEmpty)
           SliverToBoxAdapter(
             child: _HoursSection(weekdayText: weekday),
           ),
 
-        // ── Divider ──────────────────────────────────────────────────────
         SliverToBoxAdapter(
           child: Container(
             margin: const EdgeInsets.symmetric(vertical: 12),
@@ -374,7 +403,6 @@ class _PlaceBottomSheetState extends State<PlaceBottomSheet> {
           ),
         ),
 
-        // ── Posts header ─────────────────────────────────────────────────
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -392,8 +420,7 @@ class _PlaceBottomSheetState extends State<PlaceBottomSheet> {
                   const SizedBox(width: 8),
                   Text(
                     '${_posts.length}',
-                    style: const TextStyle(
-                        color: Colors.white38, fontSize: 14),
+                    style: const TextStyle(color: Colors.white38, fontSize: 14),
                   ),
                 ],
                 const Spacer(),
@@ -438,14 +465,11 @@ class _PlaceBottomSheetState extends State<PlaceBottomSheet> {
           ),
         ),
 
-        // ── Post grid or loading/empty state ─────────────────────────────
         if (_loadingPosts)
           const SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.symmetric(vertical: 40),
-              child: Center(
-                child: CircularProgressIndicator(color: _accent),
-              ),
+              child: Center(child: CircularProgressIndicator(color: _accent)),
             ),
           )
         else if (_posts.isEmpty)
@@ -464,9 +488,7 @@ class _PlaceBottomSheetState extends State<PlaceBottomSheet> {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      _canPost
-                          ? 'Be the first to post here!'
-                          : 'No posts yet.',
+                      _canPost ? 'Be the first to post here!' : 'No posts yet.',
                       style: const TextStyle(color: Colors.white38),
                     ),
                   ],
@@ -508,7 +530,6 @@ class _PlaceBottomSheetState extends State<PlaceBottomSheet> {
     );
   }
 
-  // ── Icon / colour from OSM type string ───────────────────────────────────
   IconData _iconForType(String type) {
     if (['restaurant', 'fast food', 'food court'].contains(type)) return Icons.restaurant;
     if (['bar', 'pub', 'nightclub'].contains(type)) return Icons.local_bar;
@@ -541,11 +562,9 @@ class _PlaceBottomSheetState extends State<PlaceBottomSheet> {
   }
 }
 
-// ── Small coloured chip ───────────────────────────────────────────────────
 class _Chip extends StatelessWidget {
   final String label;
   final Color  color;
-
   const _Chip({required this.label, required this.color});
 
   @override
@@ -569,7 +588,6 @@ class _Chip extends StatelessWidget {
   }
 }
 
-// ── Action button ─────────────────────────────────────────────────────────
 class _ActionBtn extends StatelessWidget {
   final IconData     icon;
   final String       label;
@@ -611,7 +629,6 @@ class _ActionBtn extends StatelessWidget {
   }
 }
 
-// ── Opening hours expandable ──────────────────────────────────────────────
 class _HoursSection extends StatefulWidget {
   final List<String> weekdayText;
   const _HoursSection({required this.weekdayText});
@@ -642,8 +659,7 @@ class _HoursSectionState extends State<_HoursSection> {
           children: [
             Row(
               children: [
-                const Icon(Icons.access_time_outlined,
-                    color: _accent, size: 16),
+                const Icon(Icons.access_time_outlined, color: _accent, size: 16),
                 const SizedBox(width: 8),
                 const Text(
                   'Opening hours',
@@ -655,9 +671,7 @@ class _HoursSectionState extends State<_HoursSection> {
                 ),
                 const Spacer(),
                 Icon(
-                  _expanded
-                      ? Icons.keyboard_arrow_up
-                      : Icons.keyboard_arrow_down,
+                  _expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
                   color: Colors.white38,
                   size: 18,
                 ),
@@ -670,8 +684,7 @@ class _HoursSectionState extends State<_HoursSection> {
                   padding: const EdgeInsets.symmetric(vertical: 2),
                   child: Text(
                     line,
-                    style: const TextStyle(
-                        color: Colors.white54, fontSize: 12),
+                    style: const TextStyle(color: Colors.white54, fontSize: 12),
                   ),
                 ),
               ),
