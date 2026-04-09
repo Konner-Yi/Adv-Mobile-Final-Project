@@ -103,12 +103,16 @@ class AuthService {
   /// Returns a live stream of the current user's Firestore profile.
   Stream<Map<String, dynamic>?> getUserProfileStream() {
     final uid = currentUser?.uid;
+    print('[AuthService] getUserProfileStream uid: $uid'); // <-- debug
     if (uid == null) return const Stream.empty();
     return _db
         .collection('users')
         .doc(uid)
         .snapshots()
-        .map((doc) => doc.exists ? doc.data() : null);
+        .map((doc) {
+      print('[AuthService] snapshot data: ${doc.data()}'); // <-- debug
+      return doc.exists ? doc.data() : null;
+    });
   }
 
   /// Updates arbitrary fields in the current user's Firestore document.

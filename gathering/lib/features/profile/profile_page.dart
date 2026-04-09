@@ -5,6 +5,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/services/auth_service.dart';
 import 'settings_page.dart';
 import 'edit_profile_page.dart';
+import 'profile_pins_grid.dart';
+import 'profile_posts_grid.dart';
+import 'profile_saved_grid.dart';
 
 class ProfilePage extends StatefulWidget {
   final String? uid;
@@ -58,6 +61,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Stream<Map<String, dynamic>?> _profileStream() {
+    print('Profile uid: ${widget.uid}');
     if (_isOwnProfile) {
       return AuthService.instance.getUserProfileStream();
     }
@@ -66,7 +70,10 @@ class _ProfilePageState extends State<ProfilePage> {
         .collection('users')
         .doc(widget.uid)
         .snapshots()
-        .map((doc) => doc.data());
+        .map((doc) {
+      print('Profile snapshot: ${doc.data()}'); // debug output
+      return doc.data();
+    });
   }
 
   String _getReputationLabel(int score) {
@@ -106,276 +113,261 @@ class _ProfilePageState extends State<ProfilePage> {
         final reputationLabel = _getReputationLabel(score);
         final reputationColor = _getReputationColor(score);
 
-        return Scaffold(
-          backgroundColor: grey50,
-          appBar: AppBar(
-            backgroundColor: white,
-            elevation: 0,
-            surfaceTintColor: Colors.transparent,
-            titleSpacing: 20,
-            title: Text(
-              username,
-              style: const TextStyle(
-                color: grey900,
-                fontWeight: FontWeight.bold,
-                fontSize: 20,
-                letterSpacing: 0.2,
-              ),
-            ),
-            actions: [
-              if (_isOwnProfile)
-                Padding(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: _SettingsButton(onTap: _openSettings),
-                ),
-            ],
-            bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(1),
-              child: Container(height: 1, color: grey200),
-            ),
-          ),
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: 100),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  color: white,
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _Avatar(photoUrl: photoUrl),
-                      const SizedBox(width: 20),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.baseline,
-                              textBaseline: TextBaseline.alphabetic,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    realName.isEmpty ? 'Add your name' : realName,
-                                    style: TextStyle(
-                                      color:
-                                          realName.isEmpty ? grey400 : grey900,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700,
-                                      fontStyle: realName.isEmpty
-                                          ? FontStyle.italic
-                                          : FontStyle.normal,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                if (pronouns.isNotEmpty) ...[
-                                  const SizedBox(width: 6),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 3,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: grey100,
-                                      borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(color: grey200),
-                                    ),
-                                    child: Text(
-                                      pronouns,
-                                      style: const TextStyle(
-                                        color: grey600,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                            const SizedBox(height: 14),
-                            Row(
-                              children: [
-                                _StatItem(
-                                  value: score.toString(),
-                                  label: 'Score',
-                                ),
-                                const SizedBox(width: 20),
-                                _StatItem(
-                                  value: followers.toString(),
-                                  label: 'Followers',
-                                ),
-                                const SizedBox(width: 20),
-                                _StatItem(
-                                  value: following.toString(),
-                                  label: 'Following',
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 5,
-                              ),
-                              decoration: BoxDecoration(
-                                color: reputationColor.withOpacity(0.12),
-                                borderRadius: BorderRadius.circular(999),
-                                border: Border.all(
-                                  color: reputationColor.withOpacity(0.28),
-                                ),
-                              ),
-                              child: Text(
-                                reputationLabel,
-                                style: TextStyle(
-                                  color: reputationColor,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+        return DefaultTabController(
+            length: 3,
+                child: Scaffold(
+              backgroundColor: grey50,
+              appBar: AppBar(
+                backgroundColor: white,
+                elevation: 0,
+                surfaceTintColor: Colors.transparent,
+                titleSpacing: 20,
+                title: Text(
+                  username,
+                  style: const TextStyle(
+                    color: grey900,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                    letterSpacing: 0.2,
                   ),
                 ),
-                Container(height: 1, color: grey200),
-                Container(
-                  color: white,
-                  width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Wrap(
-                        spacing: 14,
-                        runSpacing: 6,
+                actions: [
+                  if (_isOwnProfile)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: _SettingsButton(onTap: _openSettings),
+                    ),
+                ],
+                bottom: const TabBar(
+                  labelColor: blue,
+                  unselectedLabelColor: grey400,
+                  indicatorColor: blue,
+                  indicatorWeight: 2,
+                  tabs: [
+                    Tab(text: 'Posts'),
+                    Tab(text: 'Pins'),
+                    Tab(text: 'Saved'),
+                  ],
+                ),
+              ),
+                  body: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      color: white,
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          if (country.isNotEmpty)
-                            _MetaChip(
-                              icon: Icons.flag_outlined,
-                              text: country,
+                          _Avatar(photoUrl: photoUrl),
+                          const SizedBox(width: 20),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                                  textBaseline: TextBaseline.alphabetic,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        realName.isEmpty ? 'Add your name' : realName,
+                                        style: TextStyle(
+                                          color:
+                                              realName.isEmpty ? grey400 : grey900,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                          fontStyle: realName.isEmpty
+                                              ? FontStyle.italic
+                                              : FontStyle.normal,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    if (pronouns.isNotEmpty) ...[
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 3,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: grey100,
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(color: grey200),
+                                        ),
+                                        child: Text(
+                                          pronouns,
+                                          style: const TextStyle(
+                                            color: grey600,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 14),
+                                Row(
+                                  children: [
+                                    _StatItem(
+                                      value: score.toString(),
+                                      label: 'Score',
+                                    ),
+                                    const SizedBox(width: 20),
+                                    _StatItem(
+                                      value: followers.toString(),
+                                      label: 'Followers',
+                                    ),
+                                    const SizedBox(width: 20),
+                                    _StatItem(
+                                      value: following.toString(),
+                                      label: 'Following',
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: reputationColor.withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: Border.all(
+                                      color: reputationColor.withOpacity(0.28),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    reputationLabel,
+                                    style: TextStyle(
+                                      color: reputationColor,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          _MetaChip(
-                            icon: Icons.calendar_today_outlined,
-                            text: 'Joined ${_formatDate(profile['createdAt'])}',
                           ),
                         ],
                       ),
-                      if (bio.isNotEmpty) ...[
-                        const SizedBox(height: 12),
-                        Text(
-                          bio,
-                          style: const TextStyle(
-                            color: grey600,
-                            fontSize: 13,
-                            height: 1.55,
-                          ),
-                        ),
-                      ] else ...[
-                        const SizedBox(height: 10),
-                        Text(
-                          _isOwnProfile
-                              ? 'No bio yet — tap Edit Profile to add one.'
-                              : 'No bio yet.',
-                          style: TextStyle(
-                            color: grey400,
-                            fontSize: 13,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      ],
-                      if (tags.isNotEmpty) ...[
-                        const SizedBox(height: 14),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: tags.map((t) => _TagChip(label: t)).toList(),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                if (_isOwnProfile) ...[
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: SizedBox(
+                    ),
+                    Container(height: 1, color: grey200),
+                    Container(
+                      color: white,
                       width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: () => _openEdit(profile),
-                        icon: const Icon(Icons.edit_outlined, size: 16),
-                        label: const Text('Edit Profile'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: blue,
-                          side: const BorderSide(color: blue, width: 1.5),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Wrap(
+                            spacing: 14,
+                            runSpacing: 6,
+                            children: [
+                              if (country.isNotEmpty)
+                                _MetaChip(
+                                  icon: Icons.flag_outlined,
+                                  text: country,
+                                ),
+                              _MetaChip(
+                                icon: Icons.calendar_today_outlined,
+                                text: 'Joined ${_formatDate(profile['createdAt'])}',
+                              ),
+                            ],
+                          ),
+                          if (bio.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            Text(
+                              bio,
+                              style: const TextStyle(
+                                color: grey600,
+                                fontSize: 13,
+                                height: 1.55,
+                              ),
+                            ),
+                          ] else ...[
+                            const SizedBox(height: 10),
+                            Text(
+                              _isOwnProfile
+                                  ? 'No bio yet — tap Edit Profile to add one.'
+                                  : 'No bio yet.',
+                              style: TextStyle(
+                                color: grey400,
+                                fontSize: 13,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ],
+                          if (tags.isNotEmpty) ...[
+                            const SizedBox(height: 14),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: tags.map((t) => _TagChip(label: t)).toList(),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (_isOwnProfile) ...[
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: () => _openEdit(profile),
+                            icon: const Icon(Icons.edit_outlined, size: 16),
+                            label: const Text('Edit Profile'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: blue,
+                              side: const BorderSide(color: blue, width: 1.5),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                ] else ...[
-                  const SizedBox(height: 24),
-                ],
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Row(
-                    children: const [
-                      _TabLabel(label: 'Posts', active: true),
-                      SizedBox(width: 24),
-                      _TabLabel(label: 'Pins', active: false),
-                      SizedBox(width: 24),
-                      _TabLabel(label: 'Saved', active: false),
+                      const SizedBox(height: 24),
+                    ] else ...[
+                      const SizedBox(height: 24),
                     ],
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  height: 2,
-                  color: blue,
-                  margin: const EdgeInsets.symmetric(horizontal: 20),
-                ),
-                const SizedBox(height: 16),
-                const Center(
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.grid_off_outlined,
-                        size: 48,
-                        color: grey200,
+                    Expanded(
+                      child: TabBarView(
+                        physics: const NeverScrollableScrollPhysics(),
+                        children: [
+                          ProfilePostsGrid(
+                            uid: widget.uid ?? AuthService.instance.currentUser!.uid,
+                          ),
+                          ProfilePinsGrid(
+                            uid: widget.uid ?? AuthService.instance.currentUser!.uid,
+                          ),
+                          _isOwnProfile
+                              ? ProfileSavedGrid(
+                            uid: AuthService.instance.currentUser!.uid,
+                          )
+                              : const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 48),
+                            child: Center(
+                              child: Text(
+                                'Saved posts are private',
+                                style: TextStyle(color: grey400, fontSize: 14),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      SizedBox(height: 10),
-                      Text(
-                        'No posts yet',
-                        style: TextStyle(
-                          color: grey400,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 40),
-                if (_isOwnProfile)
-                  Center(
-                    child: TextButton.icon(
-                      onPressed: _logout,
-                      icon: const Icon(Icons.logout, size: 16),
-                      label: const Text('Log out'),
-                      style: TextButton.styleFrom(foregroundColor: grey600),
                     ),
+                  ],
                   ),
-              ],
-            ),
-          ),
+                ),
         );
-      },
+        },
     );
   }
 
