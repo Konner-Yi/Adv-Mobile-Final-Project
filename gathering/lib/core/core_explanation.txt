@@ -1,0 +1,1 @@
+the core file is for dart files that are used everywhere. Things like the THEME of the colors of the app, constants the app uses, and more

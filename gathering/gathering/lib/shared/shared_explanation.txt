@@ -1,0 +1,1 @@
+the shared folder contains widgets that can be reused between pages. Things like buttons, scaffolding, and more are located here in specific dart files
