@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'edit_profile_page.dart';
+import '../../core/services/auth_service.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -21,6 +23,76 @@ class _SettingsPageState extends State<SettingsPage> {
 
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
+
+  Future<void> _handleSettingTap(String title) async {
+    HapticFeedback.selectionClick();
+
+    switch (title) {
+      case 'Edit Profile':
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => const Center(child: CircularProgressIndicator()),
+        );
+
+        final data = await AuthService.instance.getUserProfile();
+
+        Navigator.pop(context);
+
+        if (data == null) return;
+
+        final updated = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => EditProfilePage(initialData: data),
+          ),
+        );
+
+        if (updated == true) {
+          setState(() {});
+        }
+        break;
+
+      case 'Change Password':
+        final email = AuthService.instance.currentUser?.email;
+        if (email == null) {
+          _showWIP('Error: no email found for this account');
+          return;
+        }
+
+        final error = await AuthService.instance.sendPasswordReset(email);
+
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error ?? 'Password reset email sent!'),
+            backgroundColor: error != null ? Colors.red : Colors.green,
+          ),
+        );
+        break;
+
+      default:
+        _showWIP(title);
+    }
+  }
+
+  // Show a WIP
+  void _showWIP(String title) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: const Text('This feature is still in development.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
 
   // ── Placeholder settings data ─────────────────────────────────────────────
   static const List<Map<String, dynamic>> _allSettings = [
@@ -209,9 +281,46 @@ class _SettingsPageState extends State<SettingsPage> {
                 icon: item['icon'] as IconData,
                 title: item['title'] as String,
                 subtitle: item['subtitle'] as String,
+                onTap: () => _handleSettingTap(item['title']),
               ),
             const SizedBox(height: 8),
           ],
+
+          // ── LOGOUT TILE ───────────────────────────────────────────────
+          const SizedBox(height: 12), // space above logout
+          _SettingsTile(
+            icon: Icons.logout,
+            title: 'Log Out',
+            subtitle: 'Sign out of your account',
+            onTap: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Confirm Logout'),
+                  content: const Text('Are you sure you want to log out?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text(
+                        'Log Out',
+                        style: TextStyle(color: Colors.red),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+
+              if (confirm == true) {
+                await AuthService.instance.logout();
+                if (!mounted) return;
+                Navigator.of(context).popUntil((route) => route.isFirst);
+              }
+            },
+          ),
         ],
       ),
     );
@@ -316,11 +425,13 @@ class _SettingsTile extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
+  final VoidCallback onTap;
 
   const _SettingsTile({
     required this.icon,
     required this.title,
     required this.subtitle,
+    required this.onTap,
   });
 
   @override
@@ -332,7 +443,7 @@ class _SettingsTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
-          onTap: () => HapticFeedback.selectionClick(),
+          onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
@@ -351,22 +462,18 @@ class _SettingsTile extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          color: Color(0xFF212121),
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                      Text(title,
+                          style: const TextStyle(
+                            color: Color(0xFF212121),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          )),
                       const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        style: const TextStyle(
-                          color: Color(0xFF757575),
-                          fontSize: 12,
-                        ),
-                      ),
+                      Text(subtitle,
+                          style: const TextStyle(
+                            color: Color(0xFF757575),
+                            fontSize: 12,
+                          )),
                     ],
                   ),
                 ),
