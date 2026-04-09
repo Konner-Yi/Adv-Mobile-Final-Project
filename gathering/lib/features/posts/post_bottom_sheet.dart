@@ -21,14 +21,15 @@ class PostBottomSheet extends StatefulWidget {
   State<PostBottomSheet> createState() => _PostBottomSheetState();
 }
 
-
-
 class _PostBottomSheetState extends State<PostBottomSheet> {
-  static const Color _bg      = Color(0xFF0D0D0D);
-  static const Color _surface = Color(0xFF1A1A1A);
+  static const Color _bg      = Color(0xFFFAFAFA);
+  static const Color _surface = Color(0xFFFFFFFF);
   static const Color _accent  = Color(0xFF1E88E5);
   static const Color _yellow  = Color(0xFFFFD600);
   static const Color _red     = Color(0xFFD32F2F);
+  static const Color _grey200 = Color(0xFFEEEEEE);
+  static const Color _grey600 = Color(0xFF757575);
+  static const Color _grey900 = Color(0xFF212121);
 
   bool _liked   = false;
   bool _disliked  = false;
@@ -41,7 +42,6 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
   final bool   _isGuest = FirebaseAuth.instance.currentUser == null;
   final ModerationService _moderationService = ModerationService();
 
-  // Shorthand so every method uses widget.collection automatically
   DocumentReference get _postRef =>
       FirebaseFirestore.instance.collection(widget.collection).doc(widget.postId);
 
@@ -181,8 +181,9 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: _surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Why are you disliking this?',
-            style: TextStyle(color: Colors.white)),
+            style: TextStyle(color: _grey900, fontWeight: FontWeight.bold)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -312,7 +313,7 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
     if (_isGuest) { _snackLoginRequired(); return; }
     showModalBottomSheet(
       context: context,
-      backgroundColor: _bg,
+      backgroundColor: _surface,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (_) => Padding(
@@ -322,30 +323,32 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(_isPostOwnerBlocked ? 'User Blocked' : 'Block User?',
-                style: const TextStyle(color: Colors.white, fontSize: 16,
+                style: const TextStyle(color: _grey900, fontSize: 16,
                     fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             if (_isPostOwnerBlocked) ...[
-              const Text('You have blocked this user.',
-                  style: TextStyle(color: Colors.white70, fontSize: 14)),
+              Text('You have blocked this user.',
+                  style: TextStyle(color: _grey600, fontSize: 14)),
               const SizedBox(height: 16),
               ElevatedButton(onPressed: _unblockUser,
                   style: ElevatedButton.styleFrom(backgroundColor: _accent),
-                  child: const Text('Unblock User')),
+                  child: const Text('Unblock User',
+                      style: TextStyle(color: Colors.white))),
             ] else ...[
-              const Text('Blocking this user will hide their posts from your feed.',
-                  style: TextStyle(color: Colors.white70, fontSize: 14)),
+              Text('Blocking this user will hide their posts from your feed.',
+                  style: TextStyle(color: _grey600, fontSize: 14)),
               const SizedBox(height: 16),
               ElevatedButton(onPressed: _blockUser,
                   style: ElevatedButton.styleFrom(backgroundColor: _red),
-                  child: const Text('Block User')),
+                  child: const Text('Block User',
+                      style: TextStyle(color: Colors.white))),
               const SizedBox(height: 8),
               OutlinedButton(
                   onPressed: () => Navigator.pop(context),
                   style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.white24)),
-                  child: const Text('Cancel',
-                      style: TextStyle(color: Colors.white))),
+                      side: BorderSide(color: _grey200)),
+                  child: Text('Cancel',
+                      style: TextStyle(color: _grey900))),
             ],
           ],
         ),
@@ -425,11 +428,11 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
             Icon(Icons.block, color: _red, size: 48),
             const SizedBox(height: 16),
             const Text('This post has been removed',
-                style: TextStyle(color: Colors.white, fontSize: 16,
+                style: TextStyle(color: _grey900, fontSize: 16,
                     fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Text(post['removalReason'] ?? 'Post removed by moderation',
-                style: const TextStyle(color: Colors.white54, fontSize: 14),
+                style: TextStyle(color: _grey600, fontSize: 14),
                 textAlign: TextAlign.center),
             const SizedBox(height: 40),
           ],
@@ -449,7 +452,7 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
             margin: const EdgeInsets.only(top: 10, bottom: 6),
             width: 40, height: 4,
             decoration: BoxDecoration(
-                color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+                color: _grey200, borderRadius: BorderRadius.circular(2)),
           ),
 
           // Header: avatar + username + reputation
@@ -459,11 +462,11 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
               children: [
                 CircleAvatar(
                   radius: 20,
-                  backgroundColor: _surface,
+                  backgroundColor: _grey200,
                   backgroundImage: avatarUrl.isNotEmpty
                       ? NetworkImage(avatarUrl) : null,
                   child: avatarUrl.isEmpty
-                      ? const Icon(Icons.person, color: Colors.white54) : null,
+                      ? Icon(Icons.person, color: _grey600) : null,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -482,12 +485,11 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(username,
-                              style: const TextStyle(color: Colors.white,
+                              style: const TextStyle(color: _grey900,
                                   fontWeight: FontWeight.bold, fontSize: 15)),
                           const SizedBox(height: 2),
                           Text('${_getReputationLabel(score)} • Score $score',
-                              style: const TextStyle(
-                                  color: Colors.white54, fontSize: 12)),
+                              style: TextStyle(color: _grey600, fontSize: 12)),
                         ],
                       );
                     },
@@ -496,41 +498,30 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
                 if (_uid != _postOwnerId)
                   IconButton(
                     icon: Icon(Icons.more_vert,
-                        color: _isPostOwnerBlocked ? _red : Colors.white54),
+                        color: _isPostOwnerBlocked ? _red : _grey600),
                     onPressed: _showBlockUserOptions,
                   ),
               ],
             ),
           ),
-          // if (imageUrl.isNotEmpty)
-          //   Image.network(
-          //     imageUrl,
-          //     width: double.infinity,
-          //     height: 320,
-          //     fit: BoxFit.cover,
-          //     loadingBuilder: (_, child, progress) => progress == null
-          //         ? child
-          //         : Container(
-          //             height: 320,
-          //             color: _surface,
-          //             child: const Center(
-          //               child: CircularProgressIndicator(color: _accent),
-          //             ),
-          //           ),
-          //   ),
+
+          // Image or icon
           if (imageUrl.isNotEmpty)
-            Image.network(
-              imageUrl,
-              width: double.infinity,
-              height: 320,
-              fit: BoxFit.cover,
-              loadingBuilder: (_, child, progress) => progress == null
-                  ? child
-                  : Container(
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.network(
+                imageUrl,
+                width: double.infinity,
                 height: 320,
-                color: _surface,
-                child: const Center(
-                  child: CircularProgressIndicator(color: _accent),
+                fit: BoxFit.cover,
+                loadingBuilder: (_, child, progress) => progress == null
+                    ? child
+                    : Container(
+                  height: 320,
+                  color: _grey200,
+                  child: const Center(
+                    child: CircularProgressIndicator(color: _accent),
+                  ),
                 ),
               ),
             )
@@ -552,17 +543,24 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
 
               return Column(
                 children: [
+                  // Divider
+                  Container(
+                    margin: const EdgeInsets.only(top: 12),
+                    height: 1,
+                    color: _grey200,
+                  ),
+
                   // Rating row
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 2),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 2),
                     child: Row(children: [
                       const Text('Area Rating',
-                          style: TextStyle(color: Colors.white,
+                          style: TextStyle(color: _grey900,
                               fontWeight: FontWeight.w700, fontSize: 14)),
                       const SizedBox(width: 10),
                       if (ratingCount > 0) ...[
                         Text('${avg.toStringAsFixed(1)} ★',
-                            style: const TextStyle(color: _yellow,
+                            style: const TextStyle(color: Color(0xFFF9A825),
                                 fontWeight: FontWeight.w700, fontSize: 14)),
                         const SizedBox(width: 8),
                       ],
@@ -570,8 +568,7 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
                           ratingCount > 0
                               ? '(${ratingCount.toInt()} ratings)'
                               : 'No ratings yet',
-                          style: const TextStyle(
-                              color: Colors.white54, fontSize: 12)),
+                          style: TextStyle(color: _grey600, fontSize: 12)),
                     ]),
                   ),
 
@@ -587,12 +584,14 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
                               : () => _submitRating(val),
                           icon: Icon(
                               filled ? Icons.star : Icons.star_border,
-                              color: _yellow, size: 28),
+                              color: const Color(0xFFF9A825), size: 28),
                           splashRadius: 20,
                         );
                       }),
                     ),
                   ),
+
+                  Container(height: 1, color: _grey200),
 
                   // Action buttons
                   Padding(
@@ -601,26 +600,25 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
                     child: Row(children: [
                       _ActionButton(
                           icon: _liked ? Icons.favorite : Icons.favorite_border,
-                          color: _liked ? Colors.redAccent : Colors.white70,
+                          color: _liked ? Colors.redAccent : _grey600,
                           count: likes, onTap: _toggleLike),
                       const SizedBox(width: 4),
                       _ActionButton(
                           icon: Icons.chat_bubble_outline,
-                          color: Colors.white70,
+                          color: _grey600,
                           count: comments, onTap: _openComments),
                       const SizedBox(width: 4),
                       _ActionButton(
                           icon: Icons.repeat,
-                          color: _reposted ? _yellow : Colors.white70,
+                          color: _reposted ? const Color(0xFFF9A825) : _grey600,
                           count: reposts, onTap: _toggleRepost),
                       const SizedBox(width: 4),
                       _ActionButton(
                           icon: _disliked
                               ? Icons.thumb_down : Icons.thumb_down_outlined,
-                          color: _disliked ? _red : Colors.white70,
+                          color: _disliked ? _red : _grey600,
                           count: dislikes, onTap: _toggleDislike),
                       const Spacer(),
-                      // Save button — no count, private
                       GestureDetector(
                         onTap: _toggleSave,
                         child: Padding(
@@ -628,7 +626,7 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
                               horizontal: 10, vertical: 6),
                           child: Icon(
                             _saved ? Icons.bookmark : Icons.bookmark_border,
-                            color: _saved ? _accent : Colors.white70,
+                            color: _saved ? _accent : _grey600,
                             size: 26,
                           ),
                         ),
@@ -643,10 +641,9 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
                       child: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: _red.withOpacity(0.1),
+                          color: _red.withOpacity(0.07),
                           borderRadius: BorderRadius.circular(8),
-                          border:
-                          Border.all(color: _red.withOpacity(0.3)),
+                          border: Border.all(color: _red.withOpacity(0.25)),
                         ),
                         child: Row(children: [
                           Icon(Icons.warning_outlined, color: _red, size: 16),
@@ -655,7 +652,7 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
                             child: Text(
                                 'This post has received many dislikes ($dislikes)',
                                 style: TextStyle(
-                                    color: _red.withOpacity(0.8), fontSize: 12)),
+                                    color: _red, fontSize: 12)),
                           ),
                         ]),
                       ),
@@ -668,17 +665,16 @@ class _PostBottomSheetState extends State<PostBottomSheet> {
           // Caption
           if (caption.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: RichText(
                   text: TextSpan(children: [
                     TextSpan(text: '$username ',
-                        style: const TextStyle(color: Colors.white,
+                        style: const TextStyle(color: _grey900,
                             fontWeight: FontWeight.bold, fontSize: 14)),
                     TextSpan(text: caption,
-                        style: const TextStyle(
-                            color: Colors.white70, fontSize: 14)),
+                        style: TextStyle(color: _grey600, fontSize: 14)),
                   ]),
                 ),
               ),
@@ -732,6 +728,9 @@ class _DislikeReasonButton extends StatelessWidget {
   final VoidCallback onTap;
   const _DislikeReasonButton({required this.label, required this.onTap});
 
+  static const Color _grey200 = Color(0xFFEEEEEE);
+  static const Color _grey900 = Color(0xFF212121);
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -741,8 +740,11 @@ class _DislikeReasonButton extends StatelessWidget {
         child: ElevatedButton(
           onPressed: onTap,
           style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF262626),
-              foregroundColor: Colors.white),
+              backgroundColor: _grey200,
+              foregroundColor: _grey900,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10))),
           child: Text(label),
         ),
       ),
@@ -768,9 +770,12 @@ class _CommentsSheet extends StatefulWidget {
 }
 
 class _CommentsSheetState extends State<_CommentsSheet> {
-  static const Color _bg      = Color(0xFF0D0D0D);
-  static const Color _surface = Color(0xFF1A1A1A);
+  static const Color _bg      = Color(0xFFFAFAFA);
+  static const Color _surface = Color(0xFFFFFFFF);
   static const Color _accent  = Color(0xFF1E88E5);
+  static const Color _grey200 = Color(0xFFEEEEEE);
+  static const Color _grey600 = Color(0xFF757575);
+  static const Color _grey900 = Color(0xFF212121);
 
   final _commentController = TextEditingController();
   bool    _sending = false;
@@ -832,136 +837,140 @@ class _CommentsSheetState extends State<_CommentsSheet> {
       minChildSize: 0.4,
       maxChildSize: 0.92,
       expand: false,
-      builder: (_, scrollController) => Column(
-        children: [
-          Container(
-            margin: const EdgeInsets.only(top: 10, bottom: 8),
-            width: 40, height: 4,
-            decoration: BoxDecoration(color: Colors.white24,
-                borderRadius: BorderRadius.circular(2)),
-          ),
-          const Text('Comments', style: TextStyle(color: Colors.white,
-              fontWeight: FontWeight.bold, fontSize: 16)),
-          const Divider(color: Colors.white12, height: 20),
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: _postRef.collection('comments')
-                  .orderBy('createdAt', descending: false).snapshots(),
-              builder: (_, snapshot) {
-                if (!snapshot.hasData) {
-                  return const Center(
-                      child: CircularProgressIndicator(color: _accent));
-                }
-                final allDocs  = snapshot.data!.docs;
-                final topLevel = allDocs
-                    .where((d) => (d.data() as Map)['replyToId'] == null)
-                    .toList();
-
-                if (topLevel.isEmpty) {
-                  return const Center(child: Text('No comments yet. Be first!',
-                      style: TextStyle(color: Colors.white38)));
-                }
-
-                return ListView.builder(
-                  controller: scrollController,
-                  itemCount: topLevel.length,
-                  itemBuilder: (_, i) {
-                    final doc     = topLevel[i];
-                    final c       = doc.data() as Map<String, dynamic>;
-                    final isMe    = c['userId'] == _uid;
-                    final replies = allDocs
-                        .where((d) =>
-                    (d.data() as Map)['replyToId'] == doc.id)
-                        .toList();
-
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _CommentTile(
-                          commentId: doc.id, data: c,
-                          isMe: isMe, isGuest: _isGuest,
-                          onReply: () =>
-                              _setReply(doc.id, c['username'] ?? ''),
-                          onDelete: isMe
-                              ? () => _deleteComment(doc.id) : null,
-                        ),
-                        if (replies.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(left: 48),
-                            child: Column(
-                              children: replies.map((r) {
-                                final rd   = r.data() as Map<String, dynamic>;
-                                final rMe  = rd['userId'] == _uid;
-                                return _CommentTile(
-                                  commentId: r.id, data: rd,
-                                  isMe: rMe, isGuest: _isGuest,
-                                  isReply: true,
-                                  onReply: () =>
-                                      _setReply(doc.id, rd['username'] ?? ''),
-                                  onDelete: rMe
-                                      ? () => _deleteComment(r.id) : null,
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                      ],
-                    );
-                  },
-                );
-              },
+      builder: (_, scrollController) => Container(
+        color: _bg,
+        child: Column(
+          children: [
+            // Drag handle
+            Container(
+              margin: const EdgeInsets.only(top: 10, bottom: 8),
+              width: 40, height: 4,
+              decoration: BoxDecoration(color: _grey200,
+                  borderRadius: BorderRadius.circular(2)),
             ),
-          ),
-          if (_replyToUsername != null)
+            const Text('Comments', style: TextStyle(color: _grey900,
+                fontWeight: FontWeight.bold, fontSize: 16)),
+            Divider(color: _grey200, height: 20),
+            Expanded(
+              child: StreamBuilder<QuerySnapshot>(
+                stream: _postRef.collection('comments')
+                    .orderBy('createdAt', descending: false).snapshots(),
+                builder: (_, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const Center(
+                        child: CircularProgressIndicator(color: _accent));
+                  }
+                  final allDocs  = snapshot.data!.docs;
+                  final topLevel = allDocs
+                      .where((d) => (d.data() as Map)['replyToId'] == null)
+                      .toList();
+
+                  if (topLevel.isEmpty) {
+                    return Center(child: Text('No comments yet. Be first!',
+                        style: TextStyle(color: _grey600)));
+                  }
+
+                  return ListView.builder(
+                    controller: scrollController,
+                    itemCount: topLevel.length,
+                    itemBuilder: (_, i) {
+                      final doc     = topLevel[i];
+                      final c       = doc.data() as Map<String, dynamic>;
+                      final isMe    = c['userId'] == _uid;
+                      final replies = allDocs
+                          .where((d) =>
+                      (d.data() as Map)['replyToId'] == doc.id)
+                          .toList();
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _CommentTile(
+                            commentId: doc.id, data: c,
+                            isMe: isMe, isGuest: _isGuest,
+                            onReply: () =>
+                                _setReply(doc.id, c['username'] ?? ''),
+                            onDelete: isMe
+                                ? () => _deleteComment(doc.id) : null,
+                          ),
+                          if (replies.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 48),
+                              child: Column(
+                                children: replies.map((r) {
+                                  final rd   = r.data() as Map<String, dynamic>;
+                                  final rMe  = rd['userId'] == _uid;
+                                  return _CommentTile(
+                                    commentId: r.id, data: rd,
+                                    isMe: rMe, isGuest: _isGuest,
+                                    isReply: true,
+                                    onReply: () =>
+                                        _setReply(doc.id, rd['username'] ?? ''),
+                                    onDelete: rMe
+                                        ? () => _deleteComment(r.id) : null,
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+            if (_replyToUsername != null)
+              Container(
+                color: _surface,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                child: Row(children: [
+                  const Icon(Icons.reply, color: _accent, size: 16),
+                  const SizedBox(width: 6),
+                  Text('Replying to @$_replyToUsername',
+                      style: TextStyle(color: _grey600, fontSize: 12)),
+                  const Spacer(),
+                  GestureDetector(onTap: _clearReply,
+                      child: Icon(Icons.close, color: _grey600, size: 16)),
+                ]),
+              ),
             Container(
               color: _surface,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              padding: EdgeInsets.fromLTRB(12, 8, 12,
+                  MediaQuery.of(context).padding.bottom + 8),
               child: Row(children: [
-                const Icon(Icons.reply, color: _accent, size: 16),
-                const SizedBox(width: 6),
-                Text('Replying to @$_replyToUsername',
-                    style: const TextStyle(color: Colors.white60, fontSize: 12)),
-                const Spacer(),
-                GestureDetector(onTap: _clearReply,
-                    child: const Icon(Icons.close,
-                        color: Colors.white38, size: 16)),
-              ]),
-            ),
-          Container(
-            color: _bg,
-            padding: EdgeInsets.fromLTRB(12, 8, 12,
-                MediaQuery.of(context).padding.bottom + 8),
-            child: Row(children: [
-              Expanded(
-                child: TextField(
-                  controller: _commentController,
-                  enabled: !_isGuest,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: _isGuest ? 'Sign in to comment...'
-                        : _replyToUsername != null
-                        ? 'Reply to @$_replyToUsername...'
-                        : 'Add a comment...',
-                    hintStyle: const TextStyle(color: Colors.white30),
-                    filled: true, fillColor: _surface,
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 10),
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide.none),
+                Expanded(
+                  child: TextField(
+                    controller: _commentController,
+                    enabled: !_isGuest,
+                    style: const TextStyle(color: _grey900),
+                    decoration: InputDecoration(
+                      hintText: _isGuest ? 'Sign in to comment...'
+                          : _replyToUsername != null
+                          ? 'Reply to @$_replyToUsername...'
+                          : 'Add a comment...',
+                      hintStyle: TextStyle(color: _grey600),
+                      filled: true,
+                      fillColor: _grey200,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide: BorderSide.none),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              _sending
-                  ? const SizedBox(width: 24, height: 24,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: _accent))
-                  : IconButton(
-                  icon: const Icon(Icons.send, color: _accent),
-                  onPressed: _isGuest ? null : _sendComment),
-            ]),
-          ),
-        ],
+                const SizedBox(width: 8),
+                _sending
+                    ? const SizedBox(width: 24, height: 24,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: _accent))
+                    : IconButton(
+                    icon: const Icon(Icons.send, color: _accent),
+                    onPressed: _isGuest ? null : _sendComment),
+              ]),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -978,7 +987,9 @@ class _CommentTile extends StatelessWidget {
   final VoidCallback onReply;
   final VoidCallback? onDelete;
 
-  static const Color _surface = Color(0xFF1A1A1A);
+  static const Color _grey200 = Color(0xFFEEEEEE);
+  static const Color _grey600 = Color(0xFF757575);
+  static const Color _grey900 = Color(0xFF212121);
   static const Color _accent  = Color(0xFF1E88E5);
 
   const _CommentTile({
@@ -1004,11 +1015,11 @@ class _CommentTile extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: isReply ? 14 : 18,
-            backgroundColor: _surface,
+            backgroundColor: _grey200,
             backgroundImage: avatarUrl.isNotEmpty
                 ? NetworkImage(avatarUrl) : null,
             child: avatarUrl.isEmpty
-                ? Icon(Icons.person, color: Colors.white54,
+                ? Icon(Icons.person, color: _grey600,
                 size: isReply ? 14 : 18)
                 : null,
           ),
@@ -1018,17 +1029,16 @@ class _CommentTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(children: [
-                  Text(username, style: const TextStyle(color: Colors.white,
+                  Text(username, style: const TextStyle(color: _grey900,
                       fontWeight: FontWeight.bold, fontSize: 13)),
                   const Spacer(),
                   if (onDelete != null)
                     GestureDetector(onTap: onDelete,
-                        child: const Icon(Icons.delete_outline,
-                            color: Colors.white30, size: 16)),
+                        child: Icon(Icons.delete_outline,
+                            color: _grey600, size: 16)),
                 ]),
                 const SizedBox(height: 2),
-                Text(text, style: const TextStyle(
-                    color: Colors.white70, fontSize: 13)),
+                Text(text, style: TextStyle(color: _grey600, fontSize: 13)),
                 const SizedBox(height: 4),
                 if (!isGuest)
                   GestureDetector(onTap: onReply,
@@ -1044,15 +1054,14 @@ class _CommentTile extends StatelessWidget {
   }
 }
 
-
 // ── Stock icon display in post sheet ─────────────────────────────────────────
+
 class _PostIconDisplay extends StatelessWidget {
   final String iconLabel;
   const _PostIconDisplay({required this.iconLabel});
 
   @override
   Widget build(BuildContext context) {
-    // Find the matching stock option; fall back to camera icon
     final opt = kStockOptions.firstWhere(
           (o) => o.label == iconLabel,
       orElse: () => const StockOption(
@@ -1062,11 +1071,9 @@ class _PostIconDisplay extends StatelessWidget {
       width: double.infinity,
       height: 280,
       decoration: BoxDecoration(
-        gradient: RadialGradient(
-          colors: [
-            opt.color.withOpacity(0.30),
-            opt.color.withOpacity(0.07),
-          ],
+        color: opt.color.withOpacity(0.08),
+        border: Border.symmetric(
+          horizontal: BorderSide(color: opt.color.withOpacity(0.15)),
         ),
       ),
       child: Center(
@@ -1075,4 +1082,3 @@ class _PostIconDisplay extends StatelessWidget {
     );
   }
 }
-
