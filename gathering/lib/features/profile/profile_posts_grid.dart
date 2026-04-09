@@ -47,9 +47,12 @@ class ProfilePostsGrid extends StatelessWidget {
         }
 
         return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(12),
+          padding: EdgeInsets.fromLTRB(
+            12,
+            12,
+            12,
+            MediaQuery.of(context).padding.bottom + 80, // 👈 ADD THIS
+          ),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 3,
             crossAxisSpacing: 3,
