@@ -20,95 +20,103 @@ class ProfilePostsGrid extends StatelessWidget {
       stream: FirebaseFirestore.instance
           .collection('posts')
           .where('userId', isEqualTo: uid)
-          //.where('isRemoved', isEqualTo: false)
-          .orderBy('createdAt', descending: true)
           .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Padding(
-            padding: EdgeInsets.all(40),
-            child: Center(child: CircularProgressIndicator(color: _accent)),
-          );
-        }
+      builder: (context, postsSnap) {
+        return StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('place_posts')
+              .where('userId', isEqualTo: uid)
+              .snapshots(),
+          builder: (context, placeSnap) {
+            if (postsSnap.connectionState == ConnectionState.waiting ||
+                placeSnap.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-        final docs = snapshot.data?.docs ?? [];
+            final postsDocs = postsSnap.data?.docs ?? [];
+            final placeDocs = placeSnap.data?.docs ?? [];
 
-        if (docs.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 48),
-            child: Column(
-              children: [
-                Icon(Icons.grid_off_outlined, size: 48, color: grey200),
-                SizedBox(height: 10),
-                Text('No posts yet', style: TextStyle(color: grey400, fontSize: 14)),
-              ],
-            ),
-          );
-        }
+            // 🔥 Merge both lists
+            final allDocs = [...postsDocs, ...placeDocs];
 
-        return GridView.builder(
-          padding: EdgeInsets.fromLTRB(
-            12,
-            12,
-            12,
-            MediaQuery.of(context).padding.bottom + 80, // 👈 ADD THIS
-          ),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            crossAxisSpacing: 3,
-            mainAxisSpacing: 3,
-          ),
-          itemCount: docs.length,
-          itemBuilder: (context, i) {
-            final doc  = docs[i];
-            final data = doc.data() as Map<String, dynamic>;
-            final imageUrl = data['imageUrl'] as String? ?? '';
-            final likes    = data['likes']    as int?    ?? 0;
+            // 🔥 Sort manually (VERY IMPORTANT)
+            allDocs.sort((a, b) {
+              final aTime = (a['createdAt'] as Timestamp?)?.toDate() ?? DateTime(0);
+              final bTime = (b['createdAt'] as Timestamp?)?.toDate() ?? DateTime(0);
+              return bTime.compareTo(aTime);
+            });
 
-            return GestureDetector(
-              onTap: () {
-                HapticFeedback.selectionClick();
-                final collection = data.containsKey('placeId') ? 'place_posts' : 'posts';
-                showModalBottomSheet(
-                  context: context,
-                  backgroundColor: Colors.transparent,
-                  isScrollControlled: true,
-                  builder: (_) => PostBottomSheet(
-                    post: {...data, 'postId': doc.id},
-                    postId: doc.id,
-                    collection: collection,
+            if (allDocs.isEmpty) {
+              return const Center(child: Text('No posts yet'));
+            }
+
+            return GridView.builder(
+              padding: EdgeInsets.fromLTRB(
+                12,
+                12,
+                12,
+                MediaQuery.of(context).padding.bottom + 80,
+              ),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                crossAxisSpacing: 3,
+                mainAxisSpacing: 3,
+              ),
+              itemCount: allDocs.length,
+              itemBuilder: (context, i) {
+                final doc  = allDocs[i];
+                final data = doc.data() as Map<String, dynamic>;
+
+                final imageUrl = data['imageUrl'] as String? ?? '';
+                final likes    = data['likes'] as int? ?? 0;
+
+                final isPlacePost = data.containsKey('placeId');
+                final collection = isPlacePost ? 'place_posts' : 'posts';
+
+                return GestureDetector(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    showModalBottomSheet(
+                      context: context,
+                      backgroundColor: Colors.transparent,
+                      isScrollControlled: true,
+                      builder: (_) => PostBottomSheet(
+                        post: {...data, 'postId': doc.id},
+                        postId: doc.id,
+                        collection: collection,
+                      ),
+                    );
+                  },
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      imageUrl.isNotEmpty
+                          ? Image.network(imageUrl, fit: BoxFit.cover)
+                          : Container(color: _surface,
+                          child: const Icon(Icons.photo, color: Colors.white24)),
+                      Positioned(
+                        bottom: 6,
+                        left: 6,
+                        child: Row(
+                          children: [
+                            const Icon(Icons.favorite, color: Colors.white, size: 13),
+                            const SizedBox(width: 3),
+                            Text(
+                              '$likes',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 );
               },
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  imageUrl.isNotEmpty
-                      ? Image.network(imageUrl, fit: BoxFit.cover)
-                      : Container(color: _surface,
-                      child: const Icon(Icons.photo, color: Colors.white24)),
-                  // Like count overlay
-                  Positioned(
-                    bottom: 6,
-                    left: 6,
-                    child: Row(
-                      children: [
-                        const Icon(Icons.favorite, color: Colors.white, size: 13),
-                        const SizedBox(width: 3),
-                        Text(
-                          '$likes',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
             );
           },
         );
