@@ -3,8 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/services/auth_service.dart';
+import '../../core/services/friends_service.dart';
 import 'settings_page.dart';
 import 'edit_profile_page.dart';
+import '../friends/friends_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../posts/post_bottom_sheet.dart';
 import '../posts/create_post_screen.dart'; // for kStockOptions / StockOption
@@ -52,12 +54,302 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  void _openFriends() {
+    HapticFeedback.selectionClick();
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const FriendsPage()),
+    );
+  }
+
   Future<void> _logout() async {
     HapticFeedback.selectionClick();
     await AuthService.instance.logout();
     if (mounted) {
       Navigator.pushReplacementNamed(context, '/welcome');
     }
+  }
+
+  Future<void> _showMutualFriends({
+    required String currentUid,
+    required String otherUid,
+  }) async {
+    final mutuals = await FriendsService.instance.getMutualFriends(
+      currentUserId: currentUid,
+      otherUserId: otherUid,
+    );
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (_) {
+        return Dialog(
+          backgroundColor: white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: 340,
+              maxHeight: 420,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Mutual Friends',
+                    style: TextStyle(
+                      color: grey900,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (mutuals.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Text(
+                        'No mutual friends',
+                        style: TextStyle(
+                          color: grey600,
+                          fontSize: 14,
+                        ),
+                      ),
+                    )
+                  else
+                    Flexible(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: mutuals.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 10),
+                        itemBuilder: (context, index) {
+                          final user = mutuals[index];
+                          final username = (user['username'] ?? 'User').toString();
+                          final realName = (user['realName'] ?? '').toString();
+                          final photoUrl = (user['photoUrl'] ?? '').toString();
+                          final userUid = (user['uid'] ?? '').toString();
+
+                          return GestureDetector(
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.push(
+                                this.context,
+                                MaterialPageRoute(
+                                  builder: (_) => ProfilePage(uid: userUid),
+                                ),
+                              );
+                            },
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 18,
+                                  backgroundColor: grey200,
+                                  backgroundImage: photoUrl.isNotEmpty
+                                      ? NetworkImage(photoUrl)
+                                      : null,
+                                  child: photoUrl.isEmpty
+                                      ? const Icon(
+                                          Icons.person,
+                                          size: 18,
+                                          color: grey600,
+                                        )
+                                      : null,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        username,
+                                        style: const TextStyle(
+                                          color: grey900,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      if (realName.isNotEmpty)
+                                        Text(
+                                          realName,
+                                          style: const TextStyle(
+                                            color: grey600,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: blue,
+                        foregroundColor: white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text('Close'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showFriends(String currentUid) async {
+    final friends = await FriendsService.instance.streamFriends(currentUid).first;
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (_) {
+        return Dialog(
+          backgroundColor: white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: 340,
+              maxHeight: 420,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Friends',
+                    style: TextStyle(
+                      color: grey900,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (friends.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Text(
+                        'No friends yet',
+                        style: TextStyle(
+                          color: grey600,
+                          fontSize: 14,
+                        ),
+                      ),
+                    )
+                  else
+                    Flexible(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: friends.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 10),
+                        itemBuilder: (context, index) {
+                          final user = friends[index];
+                          final username = (user['username'] ?? 'User').toString();
+                          final realName = (user['realName'] ?? '').toString();
+                          final photoUrl = (user['photoUrl'] ?? '').toString();
+                          final userUid = (user['uid'] ?? '').toString();
+
+                          return GestureDetector(
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.push(
+                                this.context,
+                                MaterialPageRoute(
+                                  builder: (_) => ProfilePage(uid: userUid),
+                                ),
+                              );
+                            },
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 18,
+                                  backgroundColor: grey200,
+                                  backgroundImage: photoUrl.isNotEmpty
+                                      ? NetworkImage(photoUrl)
+                                      : null,
+                                  child: photoUrl.isEmpty
+                                      ? const Icon(
+                                          Icons.person,
+                                          size: 18,
+                                          color: grey600,
+                                        )
+                                      : null,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        username,
+                                        style: const TextStyle(
+                                          color: grey900,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      if (realName.isNotEmpty)
+                                        Text(
+                                          realName,
+                                          style: const TextStyle(
+                                            color: grey600,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: blue,
+                        foregroundColor: white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text('Close'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Stream<Map<String, dynamic>?> _profileStream() {
@@ -88,6 +380,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final currentUid = AuthService.instance.currentUser?.uid;
+
     return StreamBuilder<Map<String, dynamic>?>(
       stream: _profileStream(),
       builder: (context, snapshot) {
@@ -98,6 +392,16 @@ class _ProfilePageState extends State<ProfilePage> {
         final bio = profile['bio'] as String? ?? '';
         final country = profile['country'] as String? ?? '';
         final photoUrl = profile['photoUrl'] as String? ?? '';
+        final score = profile['score'] ?? 0;
+        final followers = profile['followers'] ?? 0;
+        final following = profile['following'] ?? 0;
+        final friends =
+            profile['friends'] is List ? (profile['friends'] as List).length : 0;
+        final incomingRequests = profile['incomingFriendRequests'] is List
+            ? (profile['incomingFriendRequests'] as List).length
+            : 0;
+        final rawTags = profile['tags'];
+        final tags = rawTags is List ? List<String>.from(rawTags) : <String>[];
         final scoreValue = profile['score'];
         final score = scoreValue is num
             ? scoreValue.toInt()
@@ -214,6 +518,252 @@ class _ProfilePageState extends State<ProfilePage> {
                                   value: following.toString(),
                                   label: 'Following',
                                 ),
+                                const SizedBox(width: 20),
+                                GestureDetector(
+                                  onTap: () {
+                                    if (currentUid != null) {
+                                      _showFriends(currentUid);
+                                    }
+                                  },
+                                  child: _StatItem(
+                                    value: friends.toString(),
+                                    label: 'Friends',
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (!_isOwnProfile &&
+                                currentUid != null &&
+                                widget.uid != null)
+                              FutureBuilder<int>(
+                                future: FriendsService.instance
+                                    .getMutualFriendsCount(
+                                  currentUserId: currentUid,
+                                  otherUserId: widget.uid!,
+                                ),
+                                builder: (context, snapshot) {
+                                  if (!snapshot.hasData || snapshot.data == 0) {
+                                    return const SizedBox.shrink();
+                                  }
+
+                                  final count = snapshot.data!;
+
+                                  return Padding(
+                                    padding: const EdgeInsets.only(top: 8),
+                                    child: GestureDetector(
+                                      onTap: () => _showMutualFriends(
+                                        currentUid: currentUid,
+                                        otherUid: widget.uid!,
+                                      ),
+                                      child: Text(
+                                        '$count mutual friend${count == 1 ? '' : 's'}',
+                                        style: const TextStyle(
+                                          color: grey600,
+                                          fontSize: 12,
+                                          decoration: TextDecoration.underline,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (!_isOwnProfile && currentUid != null && widget.uid != null)
+                  StreamBuilder<String>(
+                    stream: FriendsService.instance.streamRelationshipStatus(
+                      currentUserId: currentUid,
+                      otherUserId: widget.uid!,
+                    ),
+                    builder: (context, snapshot) {
+                      final status = snapshot.data ?? 'none';
+
+                      return Container(
+                        color: white,
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        child: Column(
+                          children: [
+                            if (status == 'incoming')
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: ElevatedButton(
+                                      onPressed: () async {
+                                        try {
+                                          await FriendsService.instance
+                                              .acceptFriendRequest(
+                                            currentUserId: currentUid,
+                                            otherUserId: widget.uid!,
+                                          );
+
+                                          if (!context.mounted) return;
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                'Accepted $username',
+                                              ),
+                                            ),
+                                          );
+                                        } catch (e) {
+                                          if (!context.mounted) return;
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            SnackBar(
+                                              content: Text(e.toString()),
+                                            ),
+                                          );
+                                        }
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: blue,
+                                        foregroundColor: white,
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 12,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        elevation: 0,
+                                      ),
+                                      child: const Text('Accept Request'),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: ElevatedButton(
+                                      onPressed: () async {
+                                        try {
+                                          await FriendsService.instance
+                                              .declineFriendRequest(
+                                            currentUserId: currentUid,
+                                            otherUserId: widget.uid!,
+                                          );
+
+                                          if (!context.mounted) return;
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                'Declined $username',
+                                              ),
+                                            ),
+                                          );
+                                        } catch (e) {
+                                          if (!context.mounted) return;
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            SnackBar(
+                                              content: Text(e.toString()),
+                                            ),
+                                          );
+                                        }
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: grey200,
+                                        foregroundColor: grey900,
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 12,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        elevation: 0,
+                                      ),
+                                      child: const Text('Decline'),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            else
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  onPressed: () async {
+                                    try {
+                                      if (status == 'friends') {
+                                        await FriendsService.instance.removeFriend(
+                                          currentUserId: currentUid,
+                                          friendUserId: widget.uid!,
+                                        );
+                                      } else if (status == 'outgoing') {
+                                        await FriendsService.instance
+                                            .cancelFriendRequest(
+                                          currentUserId: currentUid,
+                                          otherUserId: widget.uid!,
+                                        );
+                                      } else {
+                                        await FriendsService.instance
+                                            .sendFriendRequest(
+                                          currentUserId: currentUid,
+                                          otherUserId: widget.uid!,
+                                        );
+                                      }
+
+                                      if (!context.mounted) return;
+
+                                      String message;
+                                      if (status == 'friends') {
+                                        message = 'Removed $username';
+                                      } else if (status == 'outgoing') {
+                                        message = 'Cancelled request to $username';
+                                      } else {
+                                        message = 'Sent request to $username';
+                                      }
+
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(message),
+                                        ),
+                                      );
+                                    } catch (e) {
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(e.toString()),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: status == 'friends'
+                                        ? grey200
+                                        : status == 'outgoing'
+                                            ? grey200
+                                            : blue,
+                                    foregroundColor: status == 'friends'
+                                        ? grey900
+                                        : status == 'outgoing'
+                                            ? grey900
+                                            : white,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    elevation: 0,
+                                  ),
+                                  child: Text(
+                                    status == 'friends'
+                                        ? 'Remove Friend'
+                                        : status == 'outgoing'
+                                            ? 'Cancel Request'
+                                            : 'Send Request',
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
                               ],
                             ),
                             const SizedBox(height: 10),
@@ -322,6 +872,31 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _openFriends,
+                        icon: const Icon(Icons.people),
+                        label: Text(
+                          incomingRequests > 0
+                              ? 'Friends ($incomingRequests)'
+                              : 'Friends',
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: blue,
+                          foregroundColor: white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 0,
+                        ),
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 24),
                 ] else ...[
                   const SizedBox(height: 24),
@@ -346,13 +921,39 @@ class _ProfilePageState extends State<ProfilePage> {
                   margin: const EdgeInsets.symmetric(horizontal: 20),
                 ),
                 const SizedBox(height: 16),
+                const Center(
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.grid_off_outlined,
+                        size: 48,
+                        color: grey200,
+                      ),
+                      SizedBox(height: 10),
+                      Text(
+                        'No posts yet',
+                        style: TextStyle(
+                          color: grey400,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
 
 // ── Posts grid ─────────────────────────────────────────────────
                 _ProfilePostsGrid(
                   uid: widget.uid ?? AuthService.instance.currentUser?.uid ?? '',
                 ),
-
                 const SizedBox(height: 40),
+                if (_isOwnProfile)
+                  Center(
+                    child: TextButton.icon(
+                      onPressed: _logout,
+                      icon: const Icon(Icons.logout, size: 16),
+                      label: const Text('Log out'),
+                      style: TextButton.styleFrom(foregroundColor: grey600),
+                    ),
+                  ),
               ],
             ),
           ),
