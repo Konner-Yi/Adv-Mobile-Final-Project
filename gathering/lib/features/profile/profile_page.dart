@@ -213,7 +213,10 @@ class _ProfilePageState extends State<ProfilePage> {
         .collection('users')
         .doc(widget.uid)
         .snapshots()
-        .map((doc) => doc.data());
+        .map((doc) {
+      print('Profile snapshot: ${doc.data()}'); // debug output
+      return doc.data();
+    });
   }
 
   String _getReputationLabel(int score) {
@@ -343,8 +346,29 @@ class _ProfilePageState extends State<ProfilePage> {
                                           ? FontStyle.italic
                                           : FontStyle.normal,
                                     ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
+                                    if (pronouns.isNotEmpty) ...[
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 3,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: grey100,
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(color: grey200),
+                                        ),
+                                        child: Text(
+                                          pronouns,
+                                          style: const TextStyle(
+                                            color: grey600,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
                                 if (pronouns.isNotEmpty) ...[
                                   const SizedBox(width: 6),
@@ -358,13 +382,10 @@ class _ProfilePageState extends State<ProfilePage> {
                                       border:
                                       Border.all(color: grey200),
                                     ),
-                                    child: Text(
-                                      pronouns,
-                                      style: const TextStyle(
-                                        color: grey600,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w500,
-                                      ),
+                                    const SizedBox(width: 20),
+                                    _StatItem(
+                                      value: following.toString(),
+                                      label: 'Following',
                                     ),
                                   ),
                                 ],
@@ -448,18 +469,66 @@ class _ProfilePageState extends State<ProfilePage> {
                                     color: reputationColor
                                         .withOpacity(0.28)),
                               ),
-                              child: Text(
-                                reputationLabel,
-                                style: TextStyle(
-                                  color: reputationColor,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                            ],
+                          ),
+                          if (bio.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            Text(
+                              bio,
+                              style: const TextStyle(
+                                color: grey600,
+                                fontSize: 13,
+                                height: 1.55,
+                              ),
+                            ),
+                          ] else ...[
+                            const SizedBox(height: 10),
+                            Text(
+                              _isOwnProfile
+                                  ? 'No bio yet — tap Edit Profile to add one.'
+                                  : 'No bio yet.',
+                              style: TextStyle(
+                                color: grey400,
+                                fontSize: 13,
+                                fontStyle: FontStyle.italic,
                               ),
                             ),
                           ],
+                          if (tags.isNotEmpty) ...[
+                            const SizedBox(height: 14),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: tags.map((t) => _TagChip(label: t)).toList(),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (_isOwnProfile) ...[
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: () => _openEdit(profile),
+                            icon: const Icon(Icons.edit_outlined, size: 16),
+                            label: const Text('Edit Profile'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: blue,
+                              side: const BorderSide(color: blue, width: 1.5),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
+                      const SizedBox(height: 24),
+                    ] else ...[
+                      const SizedBox(height: 24),
                     ],
                   ),
                 ),
@@ -648,21 +717,9 @@ class _ProfilePageState extends State<ProfilePage> {
                             text:
                             'Joined ${_formatDate(profile['createdAt'])}',
                           ),
-                        ],
-                      ),
-                      if (bio.isNotEmpty) ...[
-                        const SizedBox(height: 12),
-                        Text(
-                          bio,
-                          style: const TextStyle(
-                            color: grey600,
-                            fontSize: 13,
-                            height: 1.55,
+                          ProfilePinsGrid(
+                            uid: widget.uid ?? AuthService.instance.currentUser!.uid,
                           ),
-                        ),
-                      ] else ...[
-                        const SizedBox(height: 10),
-                        Text(
                           _isOwnProfile
                               ? 'No bio yet — tap Edit Profile to add one.'
                               : 'No bio yet.',
@@ -710,6 +767,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                       ),
                     ),
+                  ],
                   ),
                   const SizedBox(height: 10),
                   Padding(
@@ -778,7 +836,7 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
           ),
         );
-      },
+        },
     );
   }
 

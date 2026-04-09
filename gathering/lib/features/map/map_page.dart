@@ -28,7 +28,7 @@ class _MapScreenState extends State<MapPage>
 
   static const String mapTilerKey = 'VW5tANDMk54qd1tNkopE';
 
-  // ── Theme colours ────────────────────────────────────────────────────────
+  // ── Theme colours ─────────────────────────────────────────────────────────
   static const Color blue    = Color(0xFF1E88E5);
   static const Color yellow  = Color(0xFFFFD600);
   static const Color white   = Color(0xFFFFFFFF);
@@ -40,18 +40,29 @@ class _MapScreenState extends State<MapPage>
   // Separate map center for place loading — doesn't affect GPS dot
   LatLng? _mapCenter;
 
-  // ── Markers ──────────────────────────────────────────────────────────────
+  // ── Markers ───────────────────────────────────────────────────────────────
   final List<Marker> _postMarkers  = [];
   final List<Marker> _placeMarkers = [];
 
-  // ── Marker-placement toggle ──────────────────────────────────────────────
+  // ── Raw data (for filter rebuilds) ───────────────────────────────────────
+  List<Map<String, dynamic>> _rawPosts  = [];
+  List<Map<String, dynamic>> _rawNodes  = [];
+  final Map<String, bool>    _placeHasPosts = {};
+
+  // ── Filter state ──────────────────────────────────────────────────────────
+  bool _showPlaces      = true;
+  bool _showEmptyPlaces = true;
+  bool _showUserPosts   = true;
+  bool _showFilterPanel = false;
+
+  // ── Marker-placement toggle ───────────────────────────────────────────────
   bool _isPlacingMarker = false;
 
-  // ── Pulse animation ──────────────────────────────────────────────────────
+  // ── Pulse animation ───────────────────────────────────────────────────────
   late final AnimationController _pulseController;
   late final Animation<double>   _pulseAnim;
 
-  // ── Streams ──────────────────────────────────────────────────────────────
+  // ── Streams ───────────────────────────────────────────────────────────────
   StreamSubscription<Position>?     _positionStream;
   StreamSubscription<CompassEvent>? _compassStream;
 
@@ -139,14 +150,46 @@ class _MapScreenState extends State<MapPage>
         .orderBy('createdAt', descending: true)
         .get();
 
-    final markers = <Marker>[];
-
+    final posts = <Map<String, dynamic>>[];
     for (final doc in snapshot.docs) {
       final data = doc.data();
-      final lat  = data['lat'] as double?;
-      final lng  = data['lng'] as double?;
-      if (lat == null || lng == null) continue;
+      if (data['lat'] == null || data['lng'] == null) continue;
+      posts.add({...data, 'postId': doc.id});
+    }
 
+    // Check which OSM places have user posts (for yellow dot indicator)
+    final placePosts = await FirebaseFirestore.instance
+        .collection('place_posts')
+        .get();
+    final hasPosts = <String, bool>{};
+    for (final doc in placePosts.docs) {
+      final placeId = doc.data()['placeId'] as String?;
+      if (placeId != null) hasPosts[placeId] = true;
+    }
+
+    if (mounted) {
+      setState(() {
+        _rawPosts = posts;
+        _placeHasPosts.addAll(hasPosts);
+      });
+      _rebuildPostMarkers();
+    }
+  }
+
+  // ── Rebuild post markers (respects show/hide filter) ──────────────────────
+  void _rebuildPostMarkers() {
+    if (!_showUserPosts) {
+      setState(() => _postMarkers.clear());
+      return;
+    }
+
+    final markers = <Marker>[];
+    for (final post in _rawPosts) {
+      final lat      = (post['lat'] as num).toDouble();
+      final lng      = (post['lng'] as num).toDouble();
+      final imageUrl = post['imageUrl'] as String? ?? '';
+
+      // Exact same look as original
       markers.add(
         Marker(
           point: LatLng(lat, lng),
@@ -176,61 +219,98 @@ class _MapScreenState extends State<MapPage>
     if (center == null) return;
 
     try {
-      final nodes   = await fetchNearbyPlaces(center);
-      final markers = <Marker>[];
-
-      for (final node in nodes) {
-        final lat  = (node['lat'] as num?)?.toDouble();
-        final lng  = (node['lon'] as num?)?.toDouble();
-        final tags = node['tags'] as Map<String, dynamic>? ?? {};
-        final name = tags['name'] as String? ?? '';
-
-        if (lat == null || lng == null || name.isEmpty) continue;
-
-        final category = categoryForNode(node);
-        final icon     = _iconForCategory(category);
-        final color    = _colorForCategory(category);
-
-        markers.add(
-          Marker(
-            point: LatLng(lat, lng),
-            width: 38,
-            height: 38,
-            child: GestureDetector(
-              onTap: () => _openPlace(node),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: white,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: color, width: 2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.18),
-                      blurRadius: 5,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Icon(icon, color: color, size: 18),
-              ),
-            ),
-          ),
-        );
-      }
-
+      final nodes = await fetchNearbyPlaces(center);
       if (mounted) {
-        setState(() {
-          _placeMarkers
-            ..clear()
-            ..addAll(markers);
-        });
+        setState(() => _rawNodes = nodes);
+        _rebuildPlaceMarkers();
       }
     } catch (e) {
       debugPrint('Places load error: $e');
     }
   }
 
-  // ── Category helpers ──────────────────────────────────────────────────────
+  // ── Rebuild place markers (respects filters) ──────────────────────────────
+  void _rebuildPlaceMarkers() {
+    if (!_showPlaces) {
+      setState(() => _placeMarkers.clear());
+      return;
+    }
+
+    final markers = <Marker>[];
+
+    for (final node in _rawNodes) {
+      final lat  = (node['lat'] as num?)?.toDouble();
+      final lng  = (node['lon'] as num?)?.toDouble();
+      final tags = node['tags'] as Map<String, dynamic>? ?? {};
+      final name = tags['name'] as String? ?? '';
+      if (lat == null || lng == null || name.isEmpty) continue;
+
+      final placeId  = 'osm_${node['id']}';
+      final hasPosts = _placeHasPosts[placeId] ?? false;
+
+      // Skip empty places if that filter is off
+      if (!_showEmptyPlaces && !hasPosts) continue;
+
+      final category = categoryForNode(node);
+      final icon     = _iconForCategory(category);
+      final color    = _colorForCategory(category);
+
+      // Same look as original white circle + coloured icon
+      // + small yellow dot if the place has posts
+      markers.add(
+        Marker(
+          point: LatLng(lat, lng),
+          width: 38,
+          height: 38,
+          child: GestureDetector(
+            onTap: () => _openPlace(node),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    color: white,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: color, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.18),
+                        blurRadius: 5,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Icon(icon, color: color, size: 18),
+                ),
+                if (hasPosts)
+                  Positioned(
+                    top: -2, right: -2,
+                    child: Container(
+                      width: 10, height: 10,
+                      decoration: BoxDecoration(
+                        color: yellow,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: white, width: 1.5),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (mounted) {
+      setState(() {
+        _placeMarkers
+          ..clear()
+          ..addAll(markers);
+      });
+    }
+  }
+
+  // ── Category helpers (unchanged from original) ────────────────────────────
   IconData _iconForCategory(String category) {
     switch (category) {
       case 'food':      return Icons.restaurant;
@@ -267,7 +347,7 @@ class _MapScreenState extends State<MapPage>
     }
   }
 
-  // ── Open sheets ───────────────────────────────────────────────────────────
+  // ── Open sheets (unchanged from original) ─────────────────────────────────
   void _openPost(Map<String, dynamic> post) {
     showModalBottomSheet(
       context: context,
@@ -294,7 +374,7 @@ class _MapScreenState extends State<MapPage>
     );
   }
 
-  // ── Location init ─────────────────────────────────────────────────────────
+  // ── Location init (unchanged from original) ───────────────────────────────
   Future<void> _initLocation() async {
     try {
       LocationPermission permission = await Geolocator.requestPermission();
@@ -342,7 +422,6 @@ class _MapScreenState extends State<MapPage>
     if (loc != null) {
       _mapController.move(loc, 16);
     } else {
-      // GPS not ready yet — fetch fresh
       Geolocator.getCurrentPosition().then((pos) {
         final newLoc = LatLng(pos.latitude, pos.longitude);
         if (mounted) setState(() => _currentLocation = newLoc);
@@ -351,7 +430,7 @@ class _MapScreenState extends State<MapPage>
     }
   }
 
-  // ── Map tap ───────────────────────────────────────────────────────────────
+  // ── Map tap (unchanged from original) ─────────────────────────────────────
   void _togglePlacingMarker() {
     HapticFeedback.selectionClick();
     setState(() => _isPlacingMarker = !_isPlacingMarker);
@@ -372,16 +451,16 @@ class _MapScreenState extends State<MapPage>
     if (posted == true) _loadPosts();
   }
 
-  // ── Camera move → reload places (debounced, no GPS overwrite) ────────────
+  // ── Camera move → reload places (unchanged from original) ─────────────────
   void _onMapEvent(MapEvent event) {
     if (event is MapEventMoveEnd || event is MapEventScrollWheelZoom) {
-      _mapCenter = event.camera.center; // only update map center, not GPS
+      _mapCenter = event.camera.center;
       _placeDebounce?.cancel();
       _placeDebounce = Timer(const Duration(milliseconds: 700), _loadPlaces);
     }
   }
 
-  // ── User marker ───────────────────────────────────────────────────────────
+  // ── User marker (unchanged from original) ─────────────────────────────────
   Widget _buildUserMarker() {
     return Transform.rotate(
       angle: _heading * (pi / 180),
@@ -412,13 +491,20 @@ class _MapScreenState extends State<MapPage>
 
   @override
   Widget build(BuildContext context) {
+    // Unchanged from original
     final double navBarClearance =
         14 + 60 + MediaQuery.of(context).padding.bottom + 16;
+
+    final int activeFiltersOff = [
+      !_showPlaces,
+      !_showEmptyPlaces,
+      !_showUserPosts,
+    ].where((b) => b).length;
 
     return Scaffold(
       body: Stack(
         children: [
-          // ── Map ────────────────────────────────────────────────────────
+          // ── Map (unchanged) ───────────────────────────────────────────
           FlutterMap(
             mapController: _mapController,
             options: MapOptions(
@@ -449,7 +535,7 @@ class _MapScreenState extends State<MapPage>
             ],
           ),
 
-          // ── Placement-mode hint ────────────────────────────────────────
+          // ── Placement-mode hint (unchanged) ───────────────────────────
           if (_isPlacingMarker)
             Positioned(
               top: MediaQuery.of(context).padding.top + 16,
@@ -524,7 +610,7 @@ class _MapScreenState extends State<MapPage>
           // ── Recenter button ────────────────────────────────────────────
           Positioned(
             right: 16,
-            bottom: navBarClearance + 64, // sits above pin toggle
+            bottom: navBarClearance + 64,
             child: GestureDetector(
               onTap: _recenterOnUser,
               child: Container(
@@ -547,7 +633,7 @@ class _MapScreenState extends State<MapPage>
             ),
           ),
 
-          // ── Pin toggle button ──────────────────────────────────────────
+          // ── Pin toggle button (unchanged) ─────────────────────────────
           Positioned(
             right: 16,
             bottom: navBarClearance,
@@ -597,6 +683,80 @@ class _MapScreenState extends State<MapPage>
   }
 }
 
+// ── Filter tile ───────────────────────────────────────────────────────────
+class _FilterTile extends StatelessWidget {
+  final String   label;
+  final String   subtitle;
+  final IconData icon;
+  final bool     value;
+  final bool     enabled;
+  final ValueChanged<bool> onChanged;
+
+  const _FilterTile({
+    required this.label,
+    required this.subtitle,
+    required this.icon,
+    required this.value,
+    required this.onChanged,
+    this.enabled = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final effectiveValue = enabled ? value : false;
+    return Opacity(
+      opacity: enabled ? 1.0 : 0.4,
+      child: InkWell(
+        onTap: enabled ? () => onChanged(!value) : null,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                color: effectiveValue
+                    ? const Color(0xFF1E88E5)
+                    : Colors.white38,
+                size: 18,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: effectiveValue
+                            ? Colors.white
+                            : Colors.white54,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                          color: Colors.white38, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: effectiveValue,
+                onChanged: enabled ? onChanged : null,
+                activeColor: const Color(0xFF1E88E5),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Triangle painter (unchanged from original) ────────────────────────────
 class _TrianglePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {

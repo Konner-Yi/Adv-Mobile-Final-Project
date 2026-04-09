@@ -93,12 +93,16 @@ class AuthService {
 
   Stream<Map<String, dynamic>?> getUserProfileStream() {
     final uid = currentUser?.uid;
+    print('[AuthService] getUserProfileStream uid: $uid'); // <-- debug
     if (uid == null) return const Stream.empty();
     return _db
         .collection('users')
         .doc(uid)
         .snapshots()
-        .map((doc) => doc.exists ? doc.data() : null);
+        .map((doc) {
+      print('[AuthService] snapshot data: ${doc.data()}'); // <-- debug
+      return doc.exists ? doc.data() : null;
+    });
   }
 
   Future<void> updateUserProfile(Map<String, dynamic> fields) async {
