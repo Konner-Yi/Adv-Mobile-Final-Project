@@ -2,23 +2,18 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/services/friends_service.dart';
 import '../profile/profile_page.dart';
 
-import 'package:flutter/services.dart';
-
-import '../../core/services/chat_service.dart';
-import '../messages/models/chat_models.dart';
-import '../profile/user_profile_page.dart';
-
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
 
-  static const Color blue = Color(0xFF1E88E5);
+  static const Color blue   = Color(0xFF1E88E5);
   static const Color yellow = Color(0xFFFFD600);
-  static const Color white = Color(0xFFFFFFFF);
-  static const Color grey50 = Color(0xFFFAFAFA);
+  static const Color white  = Color(0xFFFFFFFF);
+  static const Color grey50  = Color(0xFFFAFAFA);
   static const Color grey200 = Color(0xFFEEEEEE);
   static const Color grey400 = Color(0xFFBDBDBD);
   static const Color grey600 = Color(0xFF757575);
@@ -34,21 +29,6 @@ class _SearchPageState extends State<SearchPage> {
 
   @override
   void dispose() {
-  Timer? _searchDebounce;
-
-  ChatUser? _currentUser;
-  List<ChatUser> _results = const <ChatUser>[];
-  bool _isSearching = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadCurrentUser();
-  }
-
-  @override
-  void dispose() {
-    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -56,71 +36,6 @@ class _SearchPageState extends State<SearchPage> {
   @override
   Widget build(BuildContext context) {
     final currentUid = AuthService.instance.currentUser?.uid;
-  Future<void> _loadCurrentUser() async {
-    final user = await ChatService.instance.getCurrentChatUser();
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _currentUser = user;
-    });
-  }
-
-  void _handleSearchChanged(String value) {
-    _searchDebounce?.cancel();
-    final query = value.trim();
-
-    if (query.isEmpty) {
-      setState(() {
-        _results = const <ChatUser>[];
-        _isSearching = false;
-      });
-      return;
-    }
-
-    setState(() {
-      _isSearching = true;
-    });
-
-    _searchDebounce = Timer(const Duration(milliseconds: 250), () async {
-      final currentUser = _currentUser;
-      if (currentUser == null) {
-        if (mounted) {
-          setState(() {
-            _isSearching = false;
-          });
-        }
-        return;
-      }
-
-      final results = await ChatService.instance.searchUsersByUsername(
-        query: query,
-        currentUid: currentUser.uid,
-      );
-
-      if (!mounted || _searchController.text.trim() != query) {
-        return;
-      }
-
-      setState(() {
-        _results = results;
-        _isSearching = false;
-      });
-    });
-  }
-
-  Future<void> _openUserProfile(ChatUser user) async {
-    HapticFeedback.selectionClick();
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => UserProfilePage(user: user),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final hasQuery = _searchController.text.trim().isNotEmpty;
 
     return Scaffold(
       backgroundColor: SearchPage.grey50,
@@ -169,45 +84,31 @@ class _SearchPageState extends State<SearchPage> {
                   hintStyle: const TextStyle(
                     color: SearchPage.grey600,
                     fontSize: 14,
-                autofocus: false,
-                onChanged: _handleSearchChanged,
-                textInputAction: TextInputAction.search,
-                decoration: InputDecoration(
-                  hintText: 'Search people by username',
-                  hintStyle: const TextStyle(color: SearchPage.grey600, fontSize: 14),
+                  ),
                   prefixIcon: const Icon(Icons.search, color: SearchPage.blue),
-                  suffixIcon: Container(
+                  suffixIcon: _query.isEmpty
+                      ? Container(
                     margin: const EdgeInsets.all(6),
                     decoration: const BoxDecoration(
                       color: SearchPage.yellow,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.person_search, color: SearchPage.grey900, size: 18),
-                  ),
-                  prefixIcon: const Icon(Icons.search, color: SearchPage.blue),
-                  suffixIcon: _query.isEmpty
-                      ? Container(
-                          margin: const EdgeInsets.all(6),
-                          decoration: const BoxDecoration(
-                            color: SearchPage.yellow,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.travel_explore,
-                            color: SearchPage.grey900,
-                            size: 18,
-                          ),
-                        )
+                    child: const Icon(
+                      Icons.travel_explore,
+                      color: SearchPage.grey900,
+                      size: 18,
+                    ),
+                  )
                       : IconButton(
-                          icon: const Icon(
-                            Icons.close,
-                            color: SearchPage.grey600,
-                          ),
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() => _query = '');
-                          },
-                        ),
+                    icon: const Icon(
+                      Icons.close,
+                      color: SearchPage.grey600,
+                    ),
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() => _query = '');
+                    },
+                  ),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 16,
@@ -252,6 +153,8 @@ class _SearchPageState extends State<SearchPage> {
   }
 }
 
+// ── Users search section ──────────────────────────────────────────────────────
+
 class _UsersSearchSection extends StatelessWidget {
   final String? currentUid;
   final String query;
@@ -270,10 +173,7 @@ class _UsersSearchSection extends StatelessWidget {
           child: Center(
             child: Text(
               'Not logged in',
-              style: TextStyle(
-                color: SearchPage.grey600,
-                fontSize: 16,
-              ),
+              style: TextStyle(color: SearchPage.grey600, fontSize: 16),
             ),
           ),
         ),
@@ -286,13 +186,12 @@ class _UsersSearchSection extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _SectionHeader(
-              title: 'Users',
-              icon: Icons.people_outline,
-            ),
+            const _SectionHeader(title: 'Users', icon: Icons.people_outline),
             const SizedBox(height: 12),
             StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: FirebaseFirestore.instance.collection('users').snapshots(),
+              stream: FirebaseFirestore.instance
+                  .collection('users')
+                  .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Padding(
@@ -309,9 +208,7 @@ class _UsersSearchSection extends StatelessWidget {
                     child: Text(
                       'Something went wrong',
                       style: TextStyle(
-                        color: SearchPage.grey600,
-                        fontSize: 14,
-                      ),
+                          color: SearchPage.grey600, fontSize: 14),
                     ),
                   );
                 }
@@ -320,15 +217,10 @@ class _UsersSearchSection extends StatelessWidget {
 
                 final filteredUsers = docs.where((doc) {
                   if (doc.id == currentUid) return false;
-
-                  final data = doc.data();
-                  final username =
-                      (data['username'] ?? '').toString().toLowerCase();
-                  final realName =
-                      (data['realName'] ?? '').toString().toLowerCase();
-
+                  final data     = doc.data();
+                  final username = (data['username'] ?? '').toString().toLowerCase();
+                  final realName = (data['realName'] ?? '').toString().toLowerCase();
                   if (query.isEmpty) return true;
-
                   return username.contains(query) || realName.contains(query);
                 }).toList();
 
@@ -339,9 +231,7 @@ class _UsersSearchSection extends StatelessWidget {
                       child: Text(
                         'No users found',
                         style: TextStyle(
-                          color: SearchPage.grey600,
-                          fontSize: 14,
-                        ),
+                            color: SearchPage.grey600, fontSize: 14),
                       ),
                     ),
                   );
@@ -349,7 +239,7 @@ class _UsersSearchSection extends StatelessWidget {
 
                 return Column(
                   children: filteredUsers.map((doc) {
-                    final data = doc.data();
+                    final data     = doc.data();
                     final otherUid = doc.id;
                     final username = data['username']?.toString() ?? 'User';
                     final realName = data['realName']?.toString() ?? '';
@@ -359,10 +249,10 @@ class _UsersSearchSection extends StatelessWidget {
                       padding: const EdgeInsets.only(bottom: 10),
                       child: _UserResultTile(
                         currentUid: currentUid!,
-                        otherUid: otherUid,
-                        username: username,
-                        realName: realName,
-                        photoUrl: photoUrl,
+                        otherUid:   otherUid,
+                        username:   username,
+                        realName:   realName,
+                        photoUrl:   photoUrl,
                       ),
                     );
                   }).toList(),
@@ -375,6 +265,8 @@ class _UsersSearchSection extends StatelessWidget {
     );
   }
 }
+
+// ── User result tile ──────────────────────────────────────────────────────────
 
 class _UserResultTile extends StatelessWidget {
   final String currentUid;
@@ -395,11 +287,10 @@ class _UserResultTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
+        HapticFeedback.selectionClick();
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (_) => ProfilePage(uid: otherUid),
-          ),
+          MaterialPageRoute(builder: (_) => ProfilePage(uid: otherUid)),
         );
       },
       child: Container(
@@ -415,7 +306,7 @@ class _UserResultTile extends StatelessWidget {
               radius: 24,
               backgroundColor: SearchPage.grey200,
               backgroundImage:
-                  photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
+              photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
               child: photoUrl.isEmpty
                   ? const Icon(Icons.person, color: SearchPage.grey600)
                   : null,
@@ -449,7 +340,7 @@ class _UserResultTile extends StatelessWidget {
             StreamBuilder<String>(
               stream: FriendsService.instance.streamRelationshipStatus(
                 currentUserId: currentUid,
-                otherUserId: otherUid,
+                otherUserId:   otherUid,
               ),
               builder: (context, snapshot) {
                 final status = snapshot.data ?? 'none';
@@ -460,22 +351,22 @@ class _UserResultTile extends StatelessWidget {
                       if (status == 'friends') {
                         await FriendsService.instance.removeFriend(
                           currentUserId: currentUid,
-                          friendUserId: otherUid,
+                          friendUserId:  otherUid,
                         );
                       } else if (status == 'outgoing') {
                         await FriendsService.instance.cancelFriendRequest(
                           currentUserId: currentUid,
-                          otherUserId: otherUid,
+                          otherUserId:   otherUid,
                         );
                       } else if (status == 'incoming') {
                         await FriendsService.instance.acceptFriendRequest(
                           currentUserId: currentUid,
-                          otherUserId: otherUid,
+                          otherUserId:   otherUid,
                         );
                       } else {
                         await FriendsService.instance.sendFriendRequest(
                           currentUserId: currentUid,
-                          otherUserId: otherUid,
+                          otherUserId:   otherUid,
                         );
                       }
                     } catch (e) {
@@ -486,15 +377,15 @@ class _UserResultTile extends StatelessWidget {
                     }
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        status == 'none' ? SearchPage.blue : SearchPage.grey200,
-                    foregroundColor:
-                        status == 'none' ? SearchPage.white : SearchPage.grey900,
+                    backgroundColor: status == 'none'
+                        ? SearchPage.blue
+                        : SearchPage.grey200,
+                    foregroundColor: status == 'none'
+                        ? SearchPage.white
+                        : SearchPage.grey900,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
+                        horizontal: 14, vertical: 10),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
@@ -503,10 +394,10 @@ class _UserResultTile extends StatelessWidget {
                     status == 'friends'
                         ? 'Remove'
                         : status == 'outgoing'
-                            ? 'Cancel'
-                            : status == 'incoming'
-                                ? 'Accept'
-                                : 'Send Request',
+                        ? 'Cancel'
+                        : status == 'incoming'
+                        ? 'Accept'
+                        : 'Send Request',
                   ),
                 );
               },
@@ -517,6 +408,8 @@ class _UserResultTile extends StatelessWidget {
     );
   }
 }
+
+// ── Placeholder section ───────────────────────────────────────────────────────
 
 class _PlaceholderSection extends StatelessWidget {
   final String title;
@@ -562,6 +455,8 @@ class _PlaceholderSection extends StatelessWidget {
   }
 }
 
+// ── Section card ──────────────────────────────────────────────────────────────
+
 class _SectionCard extends StatelessWidget {
   final Widget child;
 
@@ -582,14 +477,13 @@ class _SectionCard extends StatelessWidget {
   }
 }
 
+// ── Section header ────────────────────────────────────────────────────────────
+
 class _SectionHeader extends StatelessWidget {
   final String title;
   final IconData icon;
 
-  const _SectionHeader({
-    required this.title,
-    required this.icon,
-  });
+  const _SectionHeader({required this.title, required this.icon});
 
   @override
   Widget build(BuildContext context) {
@@ -606,141 +500,6 @@ class _SectionHeader extends StatelessWidget {
           ),
         ),
       ],
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
-            child: Text(
-              hasQuery ? 'Top 5 closest matches' : 'Find people',
-              style: const TextStyle(
-                color: SearchPage.grey600,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          Expanded(
-            child: _currentUser == null
-                ? const Center(child: CircularProgressIndicator())
-                : _isSearching
-                    ? const Center(child: CircularProgressIndicator())
-                    : !hasQuery
-                        ? const Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.person_search, size: 56, color: SearchPage.grey200),
-                                SizedBox(height: 16),
-                                Text(
-                                  'Search usernames to view profiles and message people.',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: SearchPage.grey600,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )
-                        : _results.isEmpty
-                            ? const Center(
-                                child: Text(
-                                  'No users matched that username.',
-                                  style: TextStyle(
-                                    color: SearchPage.grey600,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              )
-                            : ListView.separated(
-                                padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-                                itemCount: _results.length,
-                                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                                itemBuilder: (context, index) {
-                                  final user = _results[index];
-                                  return Material(
-                                    color: SearchPage.white,
-                                    borderRadius: BorderRadius.circular(18),
-                                    child: InkWell(
-                                      borderRadius: BorderRadius.circular(18),
-                                      onTap: () => _openUserProfile(user),
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(14),
-                                        child: Row(
-                                          children: [
-                                            _SearchAvatar(user: user),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    user.username,
-                                                    style: const TextStyle(
-                                                      color: SearchPage.grey900,
-                                                      fontWeight: FontWeight.w700,
-                                                      fontSize: 16,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 2),
-                                                  Text(
-                                                    user.realName.isNotEmpty
-                                                        ? user.realName
-                                                        : user.email,
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
-                                                    style: const TextStyle(
-                                                      color: SearchPage.grey600,
-                                                      fontSize: 13,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            const Icon(
-                                              Icons.chevron_right_rounded,
-                                              color: SearchPage.grey600,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SearchAvatar extends StatelessWidget {
-  const _SearchAvatar({required this.user});
-
-  final ChatUser user;
-
-  @override
-  Widget build(BuildContext context) {
-    if (user.photoUrl.isNotEmpty) {
-      return CircleAvatar(
-        radius: 26,
-        backgroundImage: NetworkImage(user.photoUrl),
-        backgroundColor: SearchPage.grey200,
-      );
-    }
-
-    return CircleAvatar(
-      radius: 26,
-      backgroundColor: SearchPage.yellow,
-      child: Text(
-        user.avatarText,
-        style: const TextStyle(
-          color: SearchPage.grey900,
-          fontWeight: FontWeight.w800,
-          fontSize: 18,
-        ),
-      ),
     );
   }
 }
