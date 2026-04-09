@@ -11,9 +11,6 @@ import 'profile_pins_grid.dart';
 import 'profile_saved_grid.dart';
 import 'profile_posts_grid.dart';
 
-// Placeholder grids to avoid errors
-
-
 class ProfilePage extends StatefulWidget {
   final String? uid;
   const ProfilePage({super.key, this.uid});
@@ -24,10 +21,10 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   // Palette
-  static const Color blue = Color(0xFF1E88E5);
-  static const Color yellow = Color(0xFFFFD600);
-  static const Color white = Color(0xFFFFFFFF);
-  static const Color grey50 = Color(0xFFFAFAFA);
+  static const Color blue    = Color(0xFF1E88E5);
+  static const Color yellow  = Color(0xFFFFD600);
+  static const Color white   = Color(0xFFFFFFFF);
+  static const Color grey50  = Color(0xFFFAFAFA);
   static const Color grey100 = Color(0xFFF5F5F5);
   static const Color grey200 = Color(0xFFEEEEEE);
   static const Color grey400 = Color(0xFFBDBDBD);
@@ -77,40 +74,16 @@ class _ProfilePageState extends State<ProfilePage> {
 
   String _getReputationLabel(int score) {
     if (score >= 150) return 'Community Leader';
-    if (score >= 75) return 'Local Guide';
-    if (score >= 25) return 'Explorer';
+    if (score >= 75)  return 'Local Guide';
+    if (score >= 25)  return 'Explorer';
     return 'Newcomer';
   }
 
   Color _getReputationColor(int score) {
     if (score >= 150) return yellow;
-    if (score >= 75) return blue;
-    if (score >= 25) return const Color(0xFF43A047);
+    if (score >= 75)  return blue;
+    if (score >= 25)  return const Color(0xFF43A047);
     return grey600;
-  }
-
-  String _formatDate(dynamic ts) {
-    if (ts == null) return '';
-    try {
-      final dt = (ts as dynamic).toDate() as DateTime;
-      const months = [
-        'Jan',
-        'Feb',
-        'Mar',
-        'Apr',
-        'May',
-        'Jun',
-        'Jul',
-        'Aug',
-        'Sep',
-        'Oct',
-        'Nov',
-        'Dec'
-      ];
-      return '${months[dt.month - 1]} ${dt.year}';
-    } catch (_) {
-      return '';
-    }
   }
 
   @override
@@ -120,19 +93,17 @@ class _ProfilePageState extends State<ProfilePage> {
     return StreamBuilder<Map<String, dynamic>?>(
       stream: _profileStream(),
       builder: (context, snapshot) {
-        final profile = snapshot.data ?? {};
+        final profile  = snapshot.data ?? {};
         final username = profile['username'] ?? 'username';
         final realName = profile['realName'] ?? '';
         final pronouns = profile['pronouns'] ?? '';
-        final bio = profile['bio'] ?? '';
-        final country = profile['country'] ?? '';
+        final bio      = profile['bio'] ?? '';
+        final country  = profile['country'] ?? '';
         final photoUrl = profile['photoUrl'] ?? '';
         final scoreValue = profile['score'];
         final score = scoreValue is num
             ? scoreValue.toInt()
             : int.tryParse(scoreValue?.toString() ?? '') ?? 0;
-        final followers = profile['followers'] ?? 0;
-        final following = profile['following'] ?? 0;
         final friends = profile['friends'] is List
             ? (profile['friends'] as List).length
             : 0;
@@ -140,7 +111,7 @@ class _ProfilePageState extends State<ProfilePage> {
             ? (profile['incomingFriendRequests'] as List).length
             : 0;
         final rawTags = profile['tags'];
-        final tags = rawTags is List ? List<String>.from(rawTags) : <String>[];
+        final tags    = rawTags is List ? List<String>.from(rawTags) : <String>[];
         final reputationLabel = _getReputationLabel(score);
         final reputationColor = _getReputationColor(score);
 
@@ -184,106 +155,120 @@ class _ProfilePageState extends State<ProfilePage> {
                 // Avatar + Stats
                 Container(
                   color: white,
-                  padding: const EdgeInsets.all(20),
-                  child: Row(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _Avatar(photoUrl: photoUrl),
-                      const SizedBox(width: 20),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Name + pronouns
-                            Row(
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _Avatar(photoUrl: photoUrl),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        realName.isEmpty ? 'Add your name' : realName,
-                                        style: TextStyle(
-                                          color: realName.isEmpty ? grey400 : grey900,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w700,
-                                          fontStyle: realName.isEmpty
-                                              ? FontStyle.italic
-                                              : FontStyle.normal,
+                                // Name + pronouns inline
+                                Wrap(
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  spacing: 8,
+                                  children: [
+                                    Text(
+                                      realName.isEmpty ? 'Add your name' : realName,
+                                      style: TextStyle(
+                                        color: realName.isEmpty ? grey400 : grey900,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                        fontStyle: realName.isEmpty
+                                            ? FontStyle.italic
+                                            : FontStyle.normal,
+                                      ),
+                                    ),
+                                    if (pronouns.isNotEmpty)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: grey100,
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(color: grey200),
+                                        ),
+                                        child: Text(
+                                          pronouns,
+                                          style: const TextStyle(
+                                              color: grey600, fontSize: 11),
                                         ),
                                       ),
-                                      if (pronouns.isNotEmpty)
-                                        Container(
-                                          margin: const EdgeInsets.only(top: 4),
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 8, vertical: 3),
-                                          decoration: BoxDecoration(
-                                            color: grey100,
-                                            borderRadius: BorderRadius.circular(10),
-                                            border: Border.all(color: grey200),
-                                          ),
-                                          child: Text(
-                                            pronouns,
-                                            style: const TextStyle(
-                                                color: grey600, fontSize: 11),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
+                                  ],
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 14),
-                            // Stats row
-                            Row(
-                              children: [
-                                _StatItem(value: score.toString(), label: 'Score'),
-                                const SizedBox(width: 16),
-                                _StatItem(value: followers.toString(), label: 'Followers'),
-                                const SizedBox(width: 16),
-                                _StatItem(value: following.toString(), label: 'Following'),
-                                const SizedBox(width: 16),
-                                GestureDetector(
-                                  onTap: () {
-                                    if (currentUid != null) {
-                                      // TODO: show friends
-                                    }
-                                  },
-                                  child:
-                                  _StatItem(value: friends.toString(), label: 'Friends'),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            // Bio
-                            Text(
-                              bio.isNotEmpty
-                                  ? bio
-                                  : _isOwnProfile
-                                  ? 'No bio yet — tap Edit Profile to add one.'
-                                  : 'No bio yet.',
-                              style: TextStyle(
-                                  color: bio.isNotEmpty ? grey900 : grey400,
-                                  fontStyle:
-                                  bio.isNotEmpty ? FontStyle.normal : FontStyle.italic,
-                                  fontSize: 13),
-                            ),
-                            if (tags.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 12),
-                                child: Wrap(
-                                  spacing: 6,
+                                const SizedBox(height: 8),
+                                // Stats + badge inline
+                                Wrap(
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  spacing: 16,
                                   runSpacing: 6,
-                                  children: tags.map((t) => _TagChip(label: t)).toList(),
+                                  children: [
+                                    _StatItem(value: score.toString(), label: 'Score'),
+                                    GestureDetector(
+                                      onTap: _openFriends,
+                                      child: _StatItem(
+                                          value: friends.toString(), label: 'Friends'),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: reputationColor.withOpacity(0.12),
+                                        borderRadius: BorderRadius.circular(999),
+                                        border: Border.all(
+                                            color: reputationColor.withOpacity(0.28)),
+                                      ),
+                                      child: Text(
+                                        reputationLabel,
+                                        style: TextStyle(
+                                          color: reputationColor,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ),
-                          ],
-                        ),
+                                const SizedBox(height: 10),
+                                // Bio
+                                Text(
+                                  bio.isNotEmpty
+                                      ? bio
+                                      : _isOwnProfile
+                                      ? 'No bio yet — tap Edit Profile to add one.'
+                                      : 'No bio yet.',
+                                  style: TextStyle(
+                                      color: bio.isNotEmpty ? grey900 : grey400,
+                                      fontStyle: bio.isNotEmpty
+                                          ? FontStyle.normal
+                                          : FontStyle.italic,
+                                      fontSize: 13,
+                                      height: 1.45),
+                                ),
+                                if (tags.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 10),
+                                    child: Wrap(
+                                      spacing: 6,
+                                      runSpacing: 6,
+                                      children:
+                                      tags.map((t) => _TagChip(label: t)).toList(),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
 
                 // Own profile buttons
                 if (_isOwnProfile)
@@ -291,7 +276,6 @@ class _ProfilePageState extends State<ProfilePage> {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Row(
                       children: [
-                        // Edit Profile button
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: () => _openEdit(profile),
@@ -306,8 +290,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 10), // space between buttons
-                        // Friends button
+                        const SizedBox(width: 10),
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: _openFriends,
@@ -329,7 +312,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       ],
                     ),
                   ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 8),
 
                 // Tabs content fills remaining space
                 Expanded(
@@ -376,7 +359,9 @@ class _SettingsButton extends StatelessWidget {
             Text(
               'Settings',
               style: TextStyle(
-                  color: Color(0xFF212121), fontSize: 13, fontWeight: FontWeight.w600),
+                  color: Color(0xFF212121),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600),
             ),
           ],
         ),
@@ -436,7 +421,8 @@ class _StatItem extends StatelessWidget {
                 fontSize: 16,
                 fontWeight: FontWeight.w800)),
         const SizedBox(height: 2),
-        Text(label, style: const TextStyle(color: Color(0xFF757575), fontSize: 11)),
+        Text(label,
+            style: const TextStyle(color: Color(0xFF757575), fontSize: 11)),
       ],
     );
   }
@@ -457,7 +443,9 @@ class _TagChip extends StatelessWidget {
       child: Text(
         label,
         style: const TextStyle(
-            color: Color(0xFF1E88E5), fontSize: 12, fontWeight: FontWeight.w500),
+            color: Color(0xFF1E88E5),
+            fontSize: 12,
+            fontWeight: FontWeight.w500),
       ),
     );
   }
