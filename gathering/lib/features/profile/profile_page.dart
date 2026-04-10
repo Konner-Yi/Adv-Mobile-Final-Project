@@ -62,7 +62,11 @@ class _ProfilePageState extends State<ProfilePage> {
         context, MaterialPageRoute(builder: (_) => const FriendsPage()));
   }
 
-  Future<void> _logout() async {
+  Future<void> _messageUser({
+    required String otherUid,
+    required String email,
+    required String username,
+    required String realName,
     required String photoUrl,
     required String pronouns,
     required String bio,
@@ -70,11 +74,17 @@ class _ProfilePageState extends State<ProfilePage> {
     required List<String> tags,
   }) async {
     if (_isOpeningChat) return;
+
+    setState(() => _isOpeningChat = true);
     HapticFeedback.selectionClick();
 
     try {
       final currentUser = await ChatService.instance.getCurrentChatUser();
       if (!mounted || currentUser == null) return;
+
+      final otherUser = ChatUser(
+        uid: otherUid,
+        email: email,
         username: username,
         realName: realName,
         photoUrl: photoUrl,
