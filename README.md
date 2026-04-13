@@ -98,6 +98,6 @@ lib/
    ```
 
 ## Images
-![Initial Screen](image.png)
+![Initial Screen](gathering/image.png)
 ![Profile](image-1.png)
 ![Menu](image-2.png)
