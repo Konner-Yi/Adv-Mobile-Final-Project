@@ -99,5 +99,5 @@ lib/
 
 ## Images
 ![Initial Screen](gathering/image.png)
-![Profile](image-1.png)
-![Menu](image-2.png)
+![Profile](gathering/image-1.png)
+![Menu](gathering/image-2.png)
