@@ -1,6 +1,7 @@
 # Gathering
 
 A map-based social discovery app built with Flutter and Firebase. Drop pins and discover new places, friends, and experiences.
+
 Github : [Link]([url](https://github.com/Konner-Yi/Adv-Mobile-Final-Project))
 
 ## Features
